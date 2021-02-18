@@ -1,5 +1,9 @@
-#include "RpcTypeInfo.h"
-#include "RpcStlTypes.h"
+#include "RpcSerdes.h"
+#include "RpcStlMap.h"
+#include "RpcStlSet.h"
+#include "RpcStlList.h"
+#include "RpcStlTuple.h"
+#include "RpcStlArray.h"
 
 #include "pet/1test/Test.h"
 

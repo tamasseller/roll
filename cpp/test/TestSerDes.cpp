@@ -1,11 +1,13 @@
-#include "RpcTypeInfo.h"
-#include "RpcStlTypes.h"
 #include "RpcSerdes.h"
+#include "RpcStlMap.h"
+#include "RpcStlSet.h"
+#include "RpcStlList.h"
+#include "RpcStlTuple.h"
+#include "RpcStlArray.h"
 
 #include "pet/1test/Test.h"
 
 #include <memory>
-
 #include <string.h>
 
 TEST_GROUP(SerDes) 
@@ -169,4 +171,21 @@ TEST(SerDes, IntToCharUnorderedMap) {
 
 TEST(SerDes, CharToIntUnorderedMultimap) {
     test(std::unordered_multimap<char, int>{{'a', 1}, {'b', 2}, {'c', 3}, {'a', 4}});
+}
+
+TEST(SerDes, MultilevelDocumentStructure) {
+    test(std::tuple<std::set<std::string>, std::map<std::pair<std::string, std::string>, int>, std::list<std::vector<std::string>>> (
+        {"alpha", "beta", "delta", "gamma", "epsilon"},
+        {
+            {{"alpha", "beta"}, 1},
+            {{"beta", "gamma"}, 2},
+            {{"alpha", "delta"}, 3},
+            {{"delta", "gamma"}, 4},
+            {{"gamma", "epsilon"}, 5}
+        },
+        {
+            {"alpha", "beta", "gamma", "beta", "alpha"},
+            {"alpha", "delta", "gamma", "epsilon"}
+        }
+    ));
 }
