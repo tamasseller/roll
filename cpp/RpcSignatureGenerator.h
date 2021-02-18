@@ -1,62 +1,31 @@
 #ifndef COMMON_RPCRPCSIGNATUREGENERATOR_H_
 #define COMMON_RPCRPCSIGNATUREGENERATOR_H_
 
-#include "RpcTypeInfo.h"
-#include "RpcCall.h"
+template<class T> struct RpcTypeInfo;
 
-#include <sstream>
+template<class S, class...> struct RpcSignatureGenerator;
 
-template<class...>struct RpcSignatureGenerator;
-
-template<> struct RpcSignatureGenerator<>
+template<class S> struct RpcSignatureGenerator<S>
 {
-	static inline void writeNextType(std::ostringstream &ss)
-	{
-		ss << ")";
+	static inline S& writeTypes(S& s) { return s;}
+	static inline S& writeNextType(S& s) { return s;}
+};
+
+template<class S, class First, class... Rest>
+struct RpcSignatureGenerator<S, First, Rest...>
+{
+	static inline S& writeNextType(S& s) {
+		return RpcSignatureGenerator<S, Rest...>::writeNextType(RpcTypeInfo<First>::writeName(s << ","));
 	}
 
-	static inline std::string generateSignature(const char* name)
-	{
-		std::stringstream ss;
-		ss << name << "()";
-		return ss.str();
+	static inline S& writeTypes(S& s) { 
+		return RpcSignatureGenerator<S, Rest...>::writeNextType(RpcTypeInfo<First>::writeName(s));
 	}
 };
 
-template<class First, class... Rest>
-struct RpcSignatureGenerator<First, Rest...>
-{
-	static inline void writeNextType(std::ostringstream &ss)
-	{
-		ss << ", " << RpcTypeInfo<typename std::remove_reference<First>::type>::name;
-		RpcSignatureGenerator<Rest...>::writeNextType(ss);
-	}
-
-	static inline std::string generateSignature(const char* name)
-	{
-		std::ostringstream ss;
-		ss << name << "(" << RpcTypeInfo<typename std::remove_reference<First>::type>::name;
-		RpcSignatureGenerator<Rest...>::writeNextType(ss);
-		return ss.str();
-	}
-};
-
-template<class... Args, class... Rest>
-struct RpcSignatureGenerator<RpcCall<Args...>, Rest...>
-{
-	static inline void writeNextType(std::ostringstream &ss)
-	{
-		ss << ", " << RpcSignatureGenerator<Args...>::generateSignature("");
-		RpcSignatureGenerator<Rest...>::writeNextType(ss);
-	}
-
-	static inline std::string generateSignature(const char* name)
-	{
-		std::ostringstream ss;
-		ss << name << "(" << RpcSignatureGenerator<Args...>::generateSignature("");
-		RpcSignatureGenerator<Rest...>::writeNextType(ss);
-		return ss.str();
-	}
+template<class... Types, class S>
+static inline auto &writeSignature(S& s) {
+	return RpcSignatureGenerator<decltype(s << "("), Types...>::writeTypes(s << "(") << ")";
 };
 
 #endif

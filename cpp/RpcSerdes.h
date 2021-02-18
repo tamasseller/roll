@@ -1,52 +1,75 @@
 #ifndef COMMON_RPCSERDES_H_
 #define COMMON_RPCSERDES_H_
 
-#include "RpcCall.h"
+#include <RpcTypeInfo.h>
 
-#include <assert.h>
-#include <type_traits>
 #include <utility>
 
-struct RpcSerializer
+namespace detail
 {
-	template<class T>
-	inline void serialize(char* &p, char* const end, T&& v)
+	template<class... Args> struct Stripped
 	{
-		auto newp = p + sizeof(T);
-		assert(newp <= end);
+		template<class C>
+		static inline constexpr void call(C&& c, Args&&... args, bool &) {
+			c(std::forward<Args>(args)...);
+		}
 
-		*((typename std::remove_reference<T>::type*)p) = v;
+		template<class Next> using Append = Stripped<Args..., Next>;
+	};
 
-		p = newp;
+	template<class... Args> struct StripLast;
+	template<> struct StripLast<bool &>  {
+		using Result = Stripped<>;
+	};
+
+	template<class First, class... Rest> struct StripLast<First, Rest...> {
+		using Result = typename StripLast<Rest...>::Result::template Append<First>;
+	};
+
+	struct CallHelper
+	{
+		template<class C, class... Types>
+		inline constexpr CallHelper(C&& c, Types&&... args) 
+		{
+			bool ok = (args, ...);
+			if(ok)
+				StripLast<Types...>::Result::template call<C>(std::forward<C>(c), std::forward<Types>(args)...);				
+		}
+	};
+	
+	template<class T, class S>
+	static inline T readNext(S& s, bool &ok) 
+	{
+		T v;
+
+		if(ok)
+		{
+			if(!RpcTypeInfo<T>::read(s, v))
+				ok = false;
+		}
+		
+		return v;
 	}
+}
 
-	template<class... Args>
-	inline void serialize(char* &p, char* const end, RpcCall<Args...>&& v) {
-		serialize(p, end, std::move(v.id));
-	}
-
-	void serialize(char* &p, char* const end, const char* &&v);
-};
-
-struct RpcDeserializer
+template<class... Args>
+size_t determineSize(Args&&... args)
 {
-	template<class T>
-	inline void deserialize(char* &p, char* const end, T&& v)
-	{
-		auto newp = p + sizeof(T);
-		assert(newp <= end);
+	return (RpcTypeInfo<Args>::size(std::forward<Args>(args)) + ... + 0);
+}
 
-		v = *((typename std::remove_reference<T>::type*)p);
+template<class... Args, class S>
+bool serialize(S& s, Args&&... args)
+{
+	return (RpcTypeInfo<Args>::write(s, std::forward<Args>(args)) && ... && true);
+}
 
-		p = newp;
-	}
-
-	template<class... Args>
-	inline void deserialize(char* &p, char* const end, RpcCall<Args...>&& v) {
-		deserialize(p, end, std::move(v.id));
-	}
-
-	void deserialize(char* &p, char* const end, const char* &&v);
-};
+template<class... Args, class C, class S>
+static inline auto deserialize(S& s, C&& c)
+{
+	bool ok = true;
+	detail::CallHelper{std::forward<C>(c), detail::readNext<Args>(s, ok)..., ok};
+	return ok;
+}
 
 #endif /* COMMON_RPCSERDES_H_ */

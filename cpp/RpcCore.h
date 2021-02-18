@@ -1,8 +1,6 @@
 #ifndef COMMON_RPCCORE_H_
 #define COMMON_RPCCORE_H_
 
-#include "Common.h"
-
 #include "meta/Tuple.h"
 #include "ubiquitous/Delegate.h"
 

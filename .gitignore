@@ -1,0 +1,7 @@
+.o
+coverage
+rpc-cpp-test*
+.project
+.cproject
+.settings
+.vscode
