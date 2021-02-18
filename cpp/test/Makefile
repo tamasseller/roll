@@ -1,7 +1,7 @@
 OUTPUT = rpc-cpp-test
 
 SOURCES += main.cpp
-#SOURCES += TestSignatureGeneration.cpp
+SOURCES += TestSignatureGeneration.cpp
 SOURCES += TestSerDes.cpp
 SOURCES += pet/ubiquitous/PrintfWriter.cpp
 

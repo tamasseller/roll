@@ -4,6 +4,7 @@
 #include <RpcTypeInfo.h>
 
 #include <utility>
+#include <type_traits>
 
 namespace detail
 {
@@ -52,16 +53,29 @@ namespace detail
 	}
 }
 
+namespace detail
+{
+	template<class C>
+	static constexpr inline size_t getSize(C&& c) {
+		return RpcTypeInfo<typename std::remove_reference<C>::type>::size(std::forward<C>(c));
+	}
+
+	template<class S, class C>
+	static constexpr inline size_t writeEntry(S& s, C&& c) {
+		return RpcTypeInfo<typename std::remove_reference<C>::type>::write(s, std::forward<C>(c));
+	}
+}
+
 template<class... Args>
 size_t determineSize(Args&&... args)
 {
-	return (RpcTypeInfo<Args>::size(std::forward<Args>(args)) + ... + 0);
+	return (detail::getSize(std::forward<Args>(args)) + ... + 0);
 }
 
 template<class... Args, class S>
 bool serialize(S& s, Args&&... args)
 {
-	return (RpcTypeInfo<Args>::write(s, std::forward<Args>(args)) && ... && true);
+	return (detail::writeEntry(s, std::forward<Args>(args)) && ... && true);
 }
 
 template<class... Args, class C, class S>
