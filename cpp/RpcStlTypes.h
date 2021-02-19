@@ -5,7 +5,9 @@
 
 #include <iterator>
 
-template<class T> struct RpcStlCollection: RpcCollectionTypeBase<T>
+namespace rpc {
+
+template<class T> struct StlCollection: CollectionTypeBase<T>
 {
     template<class C> static constexpr inline size_t size(const C& v) 
     {
@@ -14,7 +16,7 @@ template<class T> struct RpcStlCollection: RpcCollectionTypeBase<T>
 
         for(const auto &x: v)
         {
-            ret += RpcTypeInfo<T>::size(x);
+            ret += TypeInfo<T>::size(x);
             count++;
         }
 
@@ -27,7 +29,7 @@ template<class T> struct RpcStlCollection: RpcCollectionTypeBase<T>
             return false;
 
         for(const auto &v: v)
-            if(!RpcTypeInfo<T>::write(s, v))
+            if(!TypeInfo<T>::write(s, v))
                 return false;
 
         return true;
@@ -50,7 +52,7 @@ template<class T> struct RpcStlCollection: RpcCollectionTypeBase<T>
         {
             T v;
 
-            if(!RpcTypeInfo<T>::read(s, v))
+            if(!TypeInfo<T>::read(s, v))
                 return false;
 
             *oit++ = std::move(v);
@@ -60,35 +62,37 @@ template<class T> struct RpcStlCollection: RpcCollectionTypeBase<T>
     }
 };
 
-template<class T> struct RpcStlAssociativeCollection: RpcStlCollection<T>
+template<class T> struct StlAssociativeCollection: StlCollection<T>
 {
     template<class S, class C> static inline bool read(S& s, C& v) 
     {
-        return RpcStlAssociativeCollection::RpcStlCollection::read(s, v, [](uint32_t count, C& v){
+        return StlAssociativeCollection::StlCollection::read(s, v, [](uint32_t count, C& v){
             return std::inserter<C>(v, v.begin());
         });
     }
 };
 
-template<class T> struct RpcStlArrayBasedCollection: RpcStlCollection<T> 
+template<class T> struct StlArrayBasedCollection: StlCollection<T> 
 {
     template<class S, class C> static inline bool read(S& s, C& v) 
     { 
-        return RpcStlArrayBasedCollection::RpcStlCollection::read(s, v, [](uint32_t count, C& v){
+        return StlArrayBasedCollection::StlCollection::read(s, v, [](uint32_t count, C& v){
             v.reserve(count);
             return std::back_insert_iterator<C>(v);
         });
     }
 };
 
-template<class T> struct RpcStlListBasedCollection: RpcStlCollection<T> 
+template<class T> struct StlListBasedCollection: StlCollection<T> 
 {
     template<class S, class C> static inline bool read(S& s, C& v) 
     { 
-        return RpcStlListBasedCollection::RpcStlCollection::read(s, v, [](uint32_t count, C& v){
+        return StlListBasedCollection::StlCollection::read(s, v, [](uint32_t count, C& v){
             return std::back_insert_iterator<C>(v);
         });
     }
 };
+
+}
 
 #endif

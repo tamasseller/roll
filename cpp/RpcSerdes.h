@@ -6,6 +6,8 @@
 #include <utility>
 #include <type_traits>
 
+namespace rpc {
+
 namespace detail
 {
 	template<class... Args> struct Stripped
@@ -45,7 +47,7 @@ namespace detail
 
 		if(ok)
 		{
-			if(!RpcTypeInfo<T>::read(s, v))
+			if(!TypeInfo<T>::read(s, v))
 				ok = false;
 		}
 		
@@ -57,12 +59,12 @@ namespace detail
 {
 	template<class C>
 	static constexpr inline size_t getSize(C&& c) {
-		return RpcTypeInfo<typename std::remove_reference<C>::type>::size(std::forward<C>(c));
+		return TypeInfo<typename std::remove_reference<C>::type>::size(std::forward<C>(c));
 	}
 
 	template<class S, class C>
 	static constexpr inline size_t writeEntry(S& s, C&& c) {
-		return RpcTypeInfo<typename std::remove_reference<C>::type>::write(s, std::forward<C>(c));
+		return TypeInfo<typename std::remove_reference<C>::type>::write(s, std::forward<C>(c));
 	}
 }
 
@@ -84,6 +86,8 @@ static inline auto deserialize(S& s, C&& c)
 	bool ok = true;
 	detail::CallHelper{std::forward<C>(c), detail::readNext<Args>(s, ok)..., ok};
 	return ok;
+}
+
 }
 
 #endif /* COMMON_RPCSERDES_H_ */

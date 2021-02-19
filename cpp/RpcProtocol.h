@@ -4,8 +4,6 @@
 #include "RpcCore.h"
 #include "RpcSignatureGenerator.h"
 #include "RpcSerdes.h"
-#include "Common.h"
-#include "Log.h"
 
 template<class Child>
 class RpcProtocol
@@ -114,7 +112,7 @@ private:
 
 template<class Child>
 template<class... Args>
-class RpcProtocol<Child>::LookupResult<RpcCall<Args...>>
+class RpcProtocol<Child>::LookupResult<Call<Args...>>
 {
 	RpcCall<uint32_t> cb;
 	uint32_t ret;

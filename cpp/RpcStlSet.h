@@ -4,11 +4,16 @@
 #include "RpcStlTypes.h"
 
 #include <set>
-template<class T> struct RpcTypeInfo<std::set<T>>: RpcStlAssociativeCollection<T> {};
-template<class T> struct RpcTypeInfo<std::multiset<T>>: RpcStlAssociativeCollection<T> {};
-
 #include <unordered_set>
-template<class T> struct RpcTypeInfo<std::unordered_set<T>>: RpcStlAssociativeCollection<T> {};
-template<class T> struct RpcTypeInfo<std::unordered_multiset<T>>: RpcStlAssociativeCollection<T> {};
+
+namespace rpc {
+
+template<class T> struct TypeInfo<std::set<T>>: StlAssociativeCollection<T> {};
+template<class T> struct TypeInfo<std::multiset<T>>: StlAssociativeCollection<T> {};
+
+template<class T> struct TypeInfo<std::unordered_set<T>>: StlAssociativeCollection<T> {};
+template<class T> struct TypeInfo<std::unordered_multiset<T>>: StlAssociativeCollection<T> {};
+
+}
 
 #endif /* _RPCSTLSET_H_ */

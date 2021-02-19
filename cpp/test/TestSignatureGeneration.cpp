@@ -15,7 +15,7 @@ TEST_GROUP(SignatureGenerator)
     std::string sgn()
     {
         std::stringstream ss;
-        writeSignature<T...>(ss);
+        rpc::writeSignature<T...>(ss);
         return ss.str();
     }
 };
@@ -86,11 +86,11 @@ TEST(SignatureGenerator, VoidOfIntVectorAndUlongList) {
 }
 
 TEST(SignatureGenerator, IntOfNothing) {
-    CHECK(sgn<RpcCall<int>>() == "((i4))");
+    CHECK(sgn<rpc::Call<int>>() == "((i4))");
 }
 
 TEST(SignatureGenerator, IntListOfByteVector) {
-    CHECK(sgn<std::vector<unsigned char>, RpcCall<std::list<int>>>() == "([u1],([i4]))");
+    CHECK(sgn<std::vector<unsigned char>, rpc::Call<std::list<int>>>() == "([u1],([i4]))");
 }
 
 TEST(SignatureGenerator, VoidOfIntCharPair) {
@@ -106,9 +106,9 @@ TEST(SignatureGenerator, VoidOfByteVectorStringPairList) {
 }
 
 TEST(SignatureGenerator, StringToIntMultimapOfIntToStringMap) {
-    CHECK(sgn<std::map<int, std::string>, RpcCall<std::multimap<std::string, int>>>() == "([{i4,[i1]}],([{[i1],i4}]))");
+    CHECK(sgn<std::map<int, std::string>, rpc::Call<std::multimap<std::string, int>>>() == "([{i4,[i1]}],([{[i1],i4}]))");
 }
 
 TEST(SignatureGenerator, CharToIntMapOfCharSet) {
-    CHECK(sgn<std::set<char>, RpcCall<std::map<char,int>>>() == "([i1],([{i1,i4}]))");
+    CHECK(sgn<std::set<char>, rpc::Call<std::map<char,int>>>() == "([i1],([{i1,i4}]))");
 }

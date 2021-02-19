@@ -5,95 +5,20 @@
 #include "RpcStlTuple.h"
 #include "RpcStlArray.h"
 
-#include "1test/Test.h"
+#include "MockStream.h"
 
-#include <memory>
-#include <string.h>
+#include "1test/Test.h"
 
 TEST_GROUP(SerDes) 
 {
     using a = std::initializer_list<int>;
 
-    class MockStream
-    {
-        std::unique_ptr<char[]> buffer;
-        char *end;
-
-        class Accessor
-        {
-            friend MockStream;
-            char *ptr, *const end;
-            inline Accessor(char* ptr, char* end): ptr(ptr), end(end) {}
-
-        public:
-            template<class T>
-            bool write(const T& v)
-            {
-                static constexpr auto size = sizeof(T);
-                if(size <= end - ptr)
-                {
-                    memcpy(ptr, &v, size);
-                    ptr += size;
-                    return true;
-                }
-
-                return false;
-            }
-
-            template<class T>
-            bool read(T& v)
-            {
-                static constexpr auto size = sizeof(T);
-                if(size <= end - ptr)
-                {
-                    memcpy(&v, ptr, size);
-                    ptr += size;
-                    return true;
-                }
-
-                return false;
-            }
-
-            template<class T>
-            bool skip(size_t size)
-            {
-                if(size <= end - ptr)
-                {
-                    ptr += size;
-                    return true;
-                }
-
-                return false;
-            }
-        };
-
-    public:
-        inline auto access() {
-            return Accessor(buffer.get(), end);
-        }
-
-        inline bool truncateAt(size_t offset)
-        {
-            auto start = buffer.get();
-
-            if(offset < end - start)
-            {
-                end = start + offset;
-                return true;
-            }
-
-            return false;
-        }
-
-        inline MockStream(size_t size): buffer(new char[size]), end(buffer.get() + size) {};
-    };
-
     template<class... C>
     auto write(C&&... c)
     {
-        MockStream stream(determineSize<C...>(std::forward<C>(c)...));
+        MockStream stream(rpc::determineSize<C...>(std::forward<C>(c)...));
         auto a = stream.access();
-        CHECK(serialize<C...>(a, std::forward<C>(c)...));
+        CHECK(rpc::serialize<C...>(a, std::forward<C>(c)...));
         CHECK(!a.write('\0'));
         return stream;
     }
@@ -103,7 +28,7 @@ TEST_GROUP(SerDes)
     {
         bool done = false;
         auto b = stream.access();
-        bool deserOk = deserialize<C...>(b, [&done, exp{std::make_tuple<C...>(std::forward<C>(c)...)}](auto&&... args){
+        bool deserOk = rpc::deserialize<C...>(b, [&done, exp{std::make_tuple<C...>(std::forward<C>(c)...)}](auto&&... args){
             CHECK(std::make_tuple(args...) == exp);
             done = true;
         });
@@ -165,7 +90,37 @@ struct CustomDataRw
     bool operator ==(const CustomDataRw&o) const { return x == o.x; }
 };
 
-template<> struct RpcTypeInfo<CustomDataRw>
+struct CustomDataRo
+{
+    unsigned long long x = 0;
+    CustomDataRo() = default;
+    CustomDataRo(unsigned long long x): x(x) {}
+    bool operator ==(const CustomDataRo&o) const { return x == o.x; }
+};
+
+struct CustomDataWo
+{
+    unsigned long long x = 0;
+    CustomDataWo() = default;
+    CustomDataWo(unsigned long long x): x(x) {}
+    bool operator ==(const CustomDataWo&o) const { return x == o.x; }
+};
+
+namespace rpc {
+
+template<> struct TypeInfo<CustomDataRo>
+{
+    static constexpr inline size_t size(const CustomDataRo& v) { return sizeof(v.x); }
+    template<class S> static constexpr inline bool read(S &s, CustomDataRo& v)  { return s.read(v.x); }
+};
+
+template<> struct TypeInfo<CustomDataWo>
+{
+    static constexpr inline size_t size(const CustomDataWo& v) { return sizeof(v.x); }
+    template<class S> static constexpr inline bool write(S &s, const CustomDataWo& v) { return s.write(v.x); }
+};
+
+template<> struct TypeInfo<CustomDataRw>
 {
     static constexpr inline size_t size(const CustomDataRw& v) {
         return sizeof(int);
@@ -187,6 +142,8 @@ template<> struct RpcTypeInfo<CustomDataRw>
     }
 };
 
+}
+
 TEST(SerDes, CustomDataRw) 
 {
     test(CustomDataRw(123));
@@ -194,34 +151,6 @@ TEST(SerDes, CustomDataRw)
     MockStream stream(0);
     CHECK(!read(stream, CustomDataRw(123)));
 }
-
-struct CustomDataRo
-{
-    unsigned long long x = 0;
-    CustomDataRo() = default;
-    CustomDataRo(unsigned long long x): x(x) {}
-    bool operator ==(const CustomDataRo&o) const { return x == o.x; }
-};
-
-template<> struct RpcTypeInfo<CustomDataRo>
-{
-    static constexpr inline size_t size(const CustomDataRo& v) { return sizeof(v.x); }
-    template<class S> static constexpr inline bool read(S &s, CustomDataRo& v)  { return s.read(v.x); }
-};
-
-struct CustomDataWo
-{
-    unsigned long long x = 0;
-    CustomDataWo() = default;
-    CustomDataWo(unsigned long long x): x(x) {}
-    bool operator ==(const CustomDataWo&o) const { return x == o.x; }
-};
-
-template<> struct RpcTypeInfo<CustomDataWo>
-{
-    static constexpr inline size_t size(const CustomDataWo& v) { return sizeof(v.x); }
-    template<class S> static constexpr inline bool write(S &s, const CustomDataWo& v) { return s.write(v.x); }
-};
 
 TEST(SerDes, CustomDataDissimilarSingleSided) 
 {
@@ -280,13 +209,13 @@ TEST(SerDes, Truncate)
 TEST(SerDes, NoSpace)
 {
     auto data = std::string("panzerkampfwagen");
-    auto s = determineSize(data);
+    auto s = rpc::determineSize(data);
 
     for(int i = 0; i <= s; i++)
     {
         MockStream stream(i);
         auto a = stream.access();
-        bool sok = serialize(a, data);
+        bool sok = rpc::serialize(a, data);
 
         if(i < s)
             CHECK(!sok);
@@ -304,23 +233,23 @@ TEST(SerDes, VarUint4)
 
     for(auto n: ns)
     {
-        const auto s = VarUint4::size(n);
+        const auto s = rpc::VarUint4::size(n);
 
         for(int i = 0; i < s; i++)
         {
             MockStream stream(i);
             auto a = stream.access();
-            CHECK(!VarUint4::write(a, n));
+            CHECK(!rpc::VarUint4::write(a, n));
         }
 
         MockStream stream(s);
         auto a = stream.access();
-        CHECK(VarUint4::write(a, n));
+        CHECK(rpc::VarUint4::write(a, n));
         CHECK(!a.write('\0'));
 
         uint32_t r;
         auto b = stream.access();
-        CHECK(VarUint4::read(b, r));
+        CHECK(rpc::VarUint4::read(b, r));
         CHECK(r == n);
     }
 }
