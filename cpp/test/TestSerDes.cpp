@@ -20,7 +20,7 @@ TEST_GROUP(SerDes)
         auto a = stream.access();
         CHECK(rpc::serialize<C...>(a, std::forward<C>(c)...));
         CHECK(!a.write('\0'));
-        return stream;
+        return std::move(stream);
     }
 
     template<class... C>
@@ -154,7 +154,7 @@ TEST(SerDes, CustomDataRw)
 
 TEST(SerDes, CustomDataDissimilarSingleSided) 
 {
-    auto data = write(CustomDataWo{420});
+    auto data(write(CustomDataWo{420}));
     CHECK(read(data, CustomDataRo{420}));
 }
 

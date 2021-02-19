@@ -1,7 +1,7 @@
 #ifndef COMMON_RPCSERDES_H_
 #define COMMON_RPCSERDES_H_
 
-#include <RpcTypeInfo.h>
+#include "RpcTypeInfo.h"
 
 #include <utility>
 #include <type_traits>
@@ -59,18 +59,19 @@ namespace detail
 {
 	template<class C>
 	static constexpr inline size_t getSize(C&& c) {
-		return TypeInfo<typename std::remove_reference<C>::type>::size(std::forward<C>(c));
+		using Plain = typename std::remove_const_t<std::remove_reference_t<C>>;
+		return TypeInfo<Plain>::size(std::forward<C>(c));
 	}
 
 	template<class S, class C>
 	static constexpr inline size_t writeEntry(S& s, C&& c) {
-		return TypeInfo<typename std::remove_reference<C>::type>::write(s, std::forward<C>(c));
+		using Plain = typename std::remove_const_t<std::remove_reference_t<C>>;
+		return TypeInfo<Plain>::write(s, std::forward<C>(c));
 	}
 }
 
 template<class... Args>
-size_t determineSize(Args&&... args)
-{
+size_t determineSize(Args&&... args) {
 	return (detail::getSize(std::forward<Args>(args)) + ... + 0);
 }
 

@@ -1,162 +1,99 @@
 #ifndef COMMON_RPCCORE_H_
 #define COMMON_RPCCORE_H_
 
-#include "meta/Tuple.h"
-#include "ubiquitous/Delegate.h"
+#include "RpcSerdes.h"
 
-#include <unordered_map>
-#include <memory>
-#include <assert.h>
-#include <string.h>
+namespace rpc {
 
-template<class Serializer, class Deserializer>
-class RpcCore: Serializer, Deserializer
+template
+<
+	class StreamWriterFactory, 
+	template<class> class Pointer,
+	template<class, class> class Registry
+>
+class Core
 {
-	class CallItemManipulatorBase
-	{
-	protected:
-		char* p, * const end;
-		RpcCore& core;
-
-		inline CallItemManipulatorBase(RpcCore& core, char* start, char *end): p(start), end(end), core(core) {}
-	};
-
-	template<class Io>
-	class FieldIterator
-	{
-		inline void processField() {}
-
-		template<class FirstArg, class... RestOfArgs>
-		inline void processField(FirstArg&& first, RestOfArgs&&... rest)
-		{
-			static_cast<Io*>(this)->Io::workField(std::forward<FirstArg>(first));
-			processField(rest...);
-		}
-
-	protected:
-		template<class... Types>
-		void processTuple(pet::Tuple<Types...> &&t)
-		{
-			pet::move(t).moveApply([this](Types&&... t){
-				processField(pet::move(t)...);
-			});
-		}
-	};
-
-	class Marshaller: CallItemManipulatorBase, public FieldIterator<Marshaller>
-	{
-		friend FieldIterator<Marshaller>;
-
-		template<class T>
-		inline void workField(T&& v) {
-			this->core.Serializer::serialize(this->p, this->end, std::move(v));
-		}
-
-	public:
-		inline Marshaller(RpcCore& core, char* start, char *end): CallItemManipulatorBase(core, start, end) {}
-		using Marshaller::FieldIterator::processTuple;
-	};
-
-	class Unmarshaller: CallItemManipulatorBase, public FieldIterator<Unmarshaller>
-	{
-		friend FieldIterator<Unmarshaller>;
-
-		template<class T>
-		inline void workField(T&& v) {
-			this->core.Deserializer::deserialize(this->p, this->end, std::move(v));
-		}
-
-	public:
-		inline Unmarshaller(RpcCore& core, char* start, char *end): CallItemManipulatorBase(core, start, end) {}
-		using Unmarshaller::FieldIterator::processTuple;
-	};
+	using Accessor = typename StreamWriterFactory::Accessor;
+	using CallId = uint32_t;
 
 	struct IInvoker {
-		virtual void invoke(RpcCore &core, char* start, char *end) = 0;
+		virtual bool invoke(Accessor &a) = 0;
 		inline virtual ~IInvoker() = default;
 	};
 
-	template<class... Args>
+	template<class T, class... NominalArgs>
 	struct Invoker: IInvoker
 	{
-		pet::Delegate<void(Args...)> target;
-		Invoker(pet::Delegate<void(Args...)> &&target): target(std::move(target)) {}
-
-		virtual void invoke(RpcCore &core, char* start, char *end) override
-		{
-			pet::Tuple<Args...> args;
-			Unmarshaller(core, start, end).processTuple(std::move(args));
-			std::move(args).moveApply(target);
-		}
-
+		T target;
+		Invoker(T&& target): target(std::move(target)) {}
 		inline virtual ~Invoker() = default;
+
+		virtual bool invoke(Accessor &a) override {
+			return deserialize<NominalArgs...>(a, target);
+		}
 	};
 
-	std::unordered_map<uint32_t, std::unique_ptr<IInvoker>> lookupTable;
-	int maxId = 0;
+	Registry<CallId, Pointer<IInvoker>> registry;
+	CallId maxId = 0;
 
 public:
-	bool execute(CallItem* ci)
-	{
-		int id = *((int*)ci->data);
-
-		auto it = lookupTable.find(id);
-
-		if(it != lookupTable.end())
-		{
-			it->second->invoke(*this, ci->data + sizeof(int), ci->data + sizeof(ci->data));
-			return true;
-		}
-
-		return false;
+	inline ~Core() {
 	}
 
-	template<class... Args>
-	uint32_t registerCall(pet::Delegate<void(Args...)>&& call)
+	bool execute(Accessor &a)
 	{
-		int id;
-		do
+		CallId id;
+
+		if(!VarUint4::read(a, id))
+			return false;
+
+		bool ok;
+		auto it = registry.find(id, ok);
+		if(!ok)
+			return false;
+
+		return (*it)->invoke(a);
+	}
+
+	template<class... Args, class T>
+	inline bool addCallAt(CallId id, T&& call) {
+		return registry.add(id, Pointer<IInvoker>::template make<Invoker<T, Args...>>(std::move(call)));
+	}
+
+	template<class... Args, class T>
+	inline CallId add(T&& call) 
+	{
+		auto ptr = Pointer<IInvoker>::template make<Invoker<T, Args...>>(std::move(call));
+
+		CallId id;
+
+		do 
 		{
 			id = maxId++;
 		}
-		while(lookupTable.find(id) != lookupTable.end());
-
-		auto callRegistered = lookupTable.insert(std::make_pair(id, std::make_unique<Invoker<Args...>>(std::move(call)))).second;
-		assert(callRegistered);
+		while(!registry.add(id, std::move(ptr)));
+		
 		return id;
 	}
 
-	template<class... Args>
-	bool registerCall(uint32_t id, pet::Delegate<void(Args...)>&& call)
-	{
-		if(lookupTable.find(id) != lookupTable.end())
-				return false;
-
-		auto callRegistered = lookupTable.insert(std::make_pair(id, std::make_unique<Invoker<Args...>>(std::move(call)))).second;
-		assert(callRegistered);
-		return true;
+	inline bool removeCall(uint32_t id) {
+		return registry.remove(id);
 	}
 
-	bool removeCall(uint32_t id)
+	template<class... NominalArgs, class... ActualArgs>
+	static inline auto buildCall(CallId id, ActualArgs&&... args)
 	{
-		auto it = lookupTable.find(id);
+		using C = Call<NominalArgs...>;
+		C c{id};
 
-		if(it == lookupTable.end())
-			return false;
-
-		lookupTable.erase(it);
-		return true;
+		auto size = determineSize<const C&, NominalArgs...>(c, std::forward<ActualArgs>(args)...);
+		auto pdu = StreamWriterFactory::build(size);
+		bool serOk = serialize<const C&, NominalArgs...>(pdu, c, std::forward<ActualArgs>(args)...);
+		// assert(serOk);
+		return StreamWriterFactory::done(std::move(pdu));
 	}
-
-	template<class... Args>
-	inline void makeCallItem(CallItem* ci, uint32_t id, pet::Tuple<Args...>&& args)
-	{
-		*((int*)ci->data) = id;
-		Marshaller(*this, ci->data + sizeof(int), ci->data + sizeof(ci->data)).processTuple(std::move(args));
-	}
-
-	inline RpcCore(Serializer&& ser = Serializer{}, Deserializer&& des = Deserializer{}):
-		Serializer(std::move(ser)), Deserializer(std::move(des)){}
 };
+
+}
 
 #endif /* COMMON_RPCCORE_H_ */

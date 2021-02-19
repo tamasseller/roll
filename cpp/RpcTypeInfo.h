@@ -2,6 +2,7 @@
 #define COMMON_RPCTYPEINFO_H_
 
 #include "RpcSignatureGenerator.h"
+#include "RpcVarInt.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -98,11 +99,12 @@ struct Call {
 	uint32_t id = -1u;
 };
 
-template<class... Args> struct TypeInfo<Call<Args...>> {
+template<class... Args> struct TypeInfo<Call<Args...>> 
+{
 	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { return writeSignature<Args...>(s); }
-	template<class S> static inline bool write(S& s, const Call<Args...> &v) { return s.write(v.id); }
-	template<class S> static inline bool read(S& s, Call<Args...> &v) { return s.read(v.id); }
-	static constexpr inline size_t size(...) { return 4; }
+	template<class S> static inline bool write(S& s, const Call<Args...> &v) { return VarUint4::write(s, v.id); }
+	template<class S> static inline bool read(S& s, Call<Args...> &v) { return VarUint4::read(s, v.id); }
+	static constexpr inline size_t size(const Call<Args...> &v) { return VarUint4::size(v.id); }
 };
 
 template<class T> struct CollectionTypeBase { 
@@ -114,64 +116,6 @@ template<class T> struct CollectionTypeBase {
 template<class... Types> struct AggregateTypeBase { 
 	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { 
 		return SignatureGenerator<Types...>::writeTypes(s << "{") << "}";
-	}
-};
-
-struct VarUint4
-{
-	static constexpr inline size_t size(uint32_t c) 
-	{
-		if(c < 128)
-			return 1;
-		else if(c < 128 * 128)
-			return 2;
-		else if(c < 128 * 128 * 128)
-			return 3;
-		else if(c < 128 * 128 * 128 * 128)
-			return 4;
-
-		return 5;
-	}
-
-	template<class S> static inline bool write(S& s, uint32_t v) 
-	{
-		while(v >= 0x80)
-		{
-			if(!s.write(uint8_t(v | 0x80)))
-				return false;
-
-			v >>= 7;
-		}
-
-		return s.write(uint8_t(v));
-	}
-
-	template<class S> static inline bool read(S& s, uint32_t &v)
-	{
-		uint8_t nBytes = 0;
-
-		while(true)
-		{
-			uint8_t d;
-			if(!s.read(d))
-				return false;
-
-			if(++nBytes < 5)
-			{
-				v = (v >> 7) | ((uint32_t)d << (32 - 7));
-
-				if(!(d & 0x80))
-				{
-					v >>= 32 - 7 * nBytes;
-					return true;
-				}
-			}
-			else
-			{
-				v = (v >> 4) | (((uint32_t)d) << 28);
-				return true;
-			}
-		}
 	}
 };
 

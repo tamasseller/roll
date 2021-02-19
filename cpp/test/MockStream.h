@@ -9,6 +9,7 @@ class MockStream
     std::unique_ptr<char[]> buffer;
     char *end;
 
+public:
     class Accessor
     {
         friend MockStream;
@@ -57,7 +58,6 @@ class MockStream
         }
     };
 
-public:
     inline auto access() {
         return Accessor(buffer.get(), end);
     }
@@ -75,6 +75,8 @@ public:
         return false;
     }
 
+    MockStream(const MockStream&) = delete;
+    MockStream(MockStream&&) = default;
     inline MockStream(size_t size): buffer(new char[size]), end(buffer.get() + size) {};
 };
 
