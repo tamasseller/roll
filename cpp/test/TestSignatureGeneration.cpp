@@ -4,6 +4,7 @@
 #include "RpcStlList.h"
 #include "RpcStlTuple.h"
 #include "RpcStlArray.h"
+#include "RpcCTStr.h"
 
 #include "1test/Test.h"
 
@@ -12,11 +13,18 @@
 TEST_GROUP(SignatureGenerator) 
 {
     template<class... T>
-    std::string sgn()
+    std::string sgn() 
     {
+        static constexpr auto ret = rpc::writeSignature<T...>(rpc::CTStr(""));
+        auto alt = rpc::writeSignature<T...>(rpc::CTStr(""));
+        CHECK((const char*)ret != (const char*)alt);
+        CHECK(std::string((const char*)ret) == std::string((const char*)alt));
+
         std::stringstream ss;
         rpc::writeSignature<T...>(ss);
-        return ss.str();
+        CHECK(ss.str() == std::string((const char*)ret));
+
+        return (const char*)ret;
     }
 };
 
@@ -87,6 +95,46 @@ TEST(SignatureGenerator, VoidOfIntVectorAndUlongList) {
 
 TEST(SignatureGenerator, IntOfNothing) {
     CHECK(sgn<rpc::Call<int>>() == "((i4))");
+}
+
+TEST(SignatureGenerator, FwdList) {
+    CHECK(sgn<std::forward_list<int>>() == "([i4])");
+}
+
+TEST(SignatureGenerator, Deque) {
+    CHECK(sgn<std::deque<char>>() == "([i1])");
+}
+
+TEST(SignatureGenerator, Set) {
+    CHECK(sgn<std::set<short>>() == "([i2])");
+}
+
+TEST(SignatureGenerator, Multiset) {
+    CHECK(sgn<std::multiset<unsigned short>>() == "([u2])");
+}
+
+TEST(SignatureGenerator, UnorderedSet) {
+    CHECK(sgn<std::unordered_set<long>>() == "([i8])");
+}
+
+TEST(SignatureGenerator, UnorderedMultiset) {
+    CHECK(sgn<std::unordered_multiset<unsigned long>>() == "([u8])");
+}
+
+TEST(SignatureGenerator, Map) {
+    CHECK(sgn<std::map<unsigned char, short>>() == "([{u1,i2}])");
+}
+
+TEST(SignatureGenerator, MultiMap) {
+    CHECK(sgn<std::map<char, unsigned short>>() == "([{i1,u2}])");
+}
+
+TEST(SignatureGenerator, UnorderedMap) {
+    CHECK(sgn<std::unordered_map<long, int>>() == "([{i8,i4}])");
+}
+
+TEST(SignatureGenerator, UnorderedMultiMap) {
+    CHECK(sgn<std::unordered_multimap<unsigned long, unsigned int>>() == "([{u8,u4}])");
 }
 
 TEST(SignatureGenerator, IntListOfByteVector) {
