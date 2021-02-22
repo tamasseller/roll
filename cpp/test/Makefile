@@ -4,6 +4,7 @@ SOURCES += main.cpp
 SOURCES += TestSignatureGeneration.cpp
 SOURCES += TestSerDes.cpp
 SOURCES += TestCore.cpp
+# SOURCES += TestEndpoint.cpp
 SOURCES += pet/ubiquitous/PrintfWriter.cpp
 
 INCLUDE_DIRS += .

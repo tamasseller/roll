@@ -5,6 +5,8 @@
 #include "RpcStlTuple.h"
 #include "RpcStlArray.h"
 #include "RpcStreamReader.h"
+#include "RpcArrayWriter.h"
+#include "RpcCTStr.h"
 
 #include "MockStream.h"
 
@@ -390,4 +392,51 @@ TEST(SerDes, StreamClobber)
             break;
         }
     }
+}
+
+TEST(SerDes, ArrayWriter)
+{
+    unsigned short exp[] = {0xb16b, 0x00b5};
+    rpc::ArrayWriter<unsigned short> input(exp);
+
+    auto size = rpc::determineSize(input);
+    for(auto i = 0u; i < size; i++)
+    {
+        MockStream stream(i);
+        auto a = stream.access();
+        CHECK(!rpc::serialize(a, input));
+    }
+
+    for(int i = 0; ; i++)
+    {
+        auto data = write(input, -i);
+
+        bool truncated = data.truncateAt(i);
+        auto b = data.access();
+        bool done = false;
+
+        bool executed = rpc::deserialize<std::vector<unsigned short>, int>(b, 
+        [exp, i, &done](const auto& data, int j)
+        {
+            CHECK(data == std::vector<unsigned short>(exp, exp + sizeof(exp)/sizeof(exp[0])));
+            CHECK(i == -j);
+            done = true;
+        });
+
+        if(truncated)
+            CHECK(!executed && !done);
+        else
+        {
+            CHECK(executed && done);
+            break;
+        }
+    }
+}
+
+TEST(SerDes, CTStr)
+{
+    static constexpr const char str[] = "indistinguishable";
+    static constexpr auto ctstr = rpc::CTStr(str);
+    auto data = write(ctstr.writer());
+    CHECK(read(data, std::string(str)));
 }

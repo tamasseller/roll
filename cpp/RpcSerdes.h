@@ -1,5 +1,5 @@
-#ifndef COMMON_RPCSERDES_H_
-#define COMMON_RPCSERDES_H_
+#ifndef _RPCSERDES_H_
+#define _RPCSERDES_H_
 
 #include "RpcTypeInfo.h"
 #include "RpcUtility.h"
@@ -89,4 +89,4 @@ static inline auto deserialize(S& s, C&& c)
 
 }
 
-#endif /* COMMON_RPCSERDES_H_ */
+#endif /* _RPCSERDES_H_ */

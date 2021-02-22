@@ -1,5 +1,5 @@
-#ifndef COMMON_RPCCORE_H_
-#define COMMON_RPCCORE_H_
+#ifndef _RPCCORE_H_
+#define _RPCCORE_H_
 
 #include "RpcSerdes.h"
 
@@ -96,4 +96,4 @@ public:
 
 }
 
-#endif /* COMMON_RPCCORE_H_ */
+#endif /* _RPCCORE_H_ */

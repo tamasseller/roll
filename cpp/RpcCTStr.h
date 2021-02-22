@@ -1,6 +1,8 @@
 #ifndef _RPCCTSTR_H_
 #define _RPCCTSTR_H_
 
+#include "RpcArrayWriter.h"
+
 #include <stddef.h>
 
 namespace rpc {
@@ -32,6 +34,7 @@ public:
      
     constexpr operator const char *() const { return data; }
     constexpr size_t size() const { return size; }   
+    constexpr ArrayWriter<char> writer() const { return ArrayWriter<char>(data, length); }
 };
 
 template <size_t n1, size_t n2>

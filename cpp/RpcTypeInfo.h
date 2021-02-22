@@ -1,5 +1,5 @@
-#ifndef COMMON_RPCTYPEINFO_H_
-#define COMMON_RPCTYPEINFO_H_
+#ifndef _RPCTYPEINFO_H_
+#define _RPCTYPEINFO_H_
 
 #include "RpcSignatureGenerator.h"
 #include "RpcVarInt.h"
@@ -127,7 +127,8 @@ template<class... Args> struct TypeInfo<Call<Args...>>
 	static constexpr inline bool isConstSize() { return false; }
 };
 
-template<class T> struct CollectionTypeBase { 
+template<class T> struct CollectionTypeBase
+{ 
 	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { 
 		return TypeInfo<T>::writeName(s << "[") << "]";
 	}
@@ -148,6 +149,31 @@ template<class T> struct CollectionTypeBase {
 	static constexpr inline bool isConstSize() { return false; }
 };
 
+template<class T> struct StlCompatibleCollectionTypeBase: CollectionTypeBase<T>
+{ 
+    template<class C> static constexpr inline size_t size(const C& v) 
+    {
+        size_t contentSize = 0;
+        uint32_t count = 0;
+
+        if constexpr(TypeInfo<T>::isConstSize())
+        {
+            count = v.size();
+            contentSize = count ? (count * TypeInfo<T>::size(*v.begin())) : 0;
+        }
+        else
+        {
+            for(const auto &x: v)
+            {
+                contentSize += TypeInfo<T>::size(x);
+                count++;
+            }
+        }
+
+        return contentSize + VarUint4::size(count);
+    }
+};
+
 template<class... Types> struct AggregateTypeBase 
 {
 	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { 
@@ -165,4 +191,4 @@ template<class... Types> struct AggregateTypeBase
 
 }
 
-#endif /* COMMON_RPCTYPEINFO_H_ */
+#endif /* _RPCTYPEINFO_H_ */

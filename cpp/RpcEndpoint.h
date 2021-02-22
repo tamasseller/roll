@@ -1,46 +1,31 @@
-#ifndef COMMON_RPCPROTOCOL_H_
-#define COMMON_RPCPROTOCOL_H_
+#ifndef _RPCENDPOINT_H_
+#define _RPCENDPOINT_H_
 
 #include "RpcCore.h"
+#include "RpcStreamReader.h"
 #include "RpcSignatureGenerator.h"
-#include "RpcSerdes.h"
 
-template<class Child>
-class RpcProtocol
+#include <unordered_map>
+
+namespace rpc {
+
+template <
+	class NameRegistry,
+	class StreamWriterFactory, 
+	template<class> class Pointer,
+	template<class, class> class Registry
+>
+class Endpoint: Core<StreamWriterFactory, Pointer, Registry>, NameRegistry
 {
 	static constexpr uint32_t lookupId = 0;
 
-	RpcCore<RpcSerializer, RpcDeserializer> rpcCore;
-	std::unordered_map<std::string, uint32_t> fwdLookupTable;
-	std::unordered_map<uint32_t, std::string> bwdLookupTable;
-
 public:
-	using ListCb = RpcCall<const char*>;
-	using ListFwd = RpcCall<ListCb>;
-	static constexpr const char *listName = "lsrpc";
-
-	inline RpcProtocol()
+	bool init()
 	{
-		assert(rpcCore.registerCall(lookupId, pet::delegate([this](RpcCall<uint32_t> cb, const char* name)
+		this->addCallAt(lookupId, [this](StreamReader<StreamReader<char>> names, Call<StreamWriter<>>)
 		{
-			auto it = fwdLookupTable.find(name);
 
-			if(it == fwdLookupTable.end())
-				Log(Log::Level::Warning) << "serving RPC name lookup for unknown '" << name << "'";
-
-			call(cb, it != fwdLookupTable.end() ? it->second : -1u);
-		})));
-
-		ListFwd listFwd = install(pet::delegate([this](ListCb cb)
-		{
-			for(auto& x: fwdLookupTable)
-				call(cb, x.first.c_str());
-
-			call(cb, "");
-		}));
-
-		bool lsProvideOk = provide(listName, listFwd);
-		assert(lsProvideOk);
+		});
 	}
 
 	template<class... CallArgs, class... InvokeArgs>
@@ -123,7 +108,7 @@ public:
 		return prot.processOne(maxWaitMs);
 	}
 
-	bool takeResult(RpcProtocol &prot, RpcCall<Args...>& out)
+	bool takeResult(Endpoint &prot, RpcCall<Args...>& out)
 	{
 		if(done)
 		{
@@ -140,7 +125,7 @@ public:
 		return false;
 	}
 
-	inline auto lookup(RpcProtocol &prot, const char* name)
+	inline auto lookup(Endpoint &prot, const char* name)
 	{
 		auto sgn = RpcSignatureGenerator<Args...>::generateSignature(name);
 
@@ -160,4 +145,6 @@ public:
 	}
 };
 
-#endif /* COMMON_RPCPROTOCOL_H_ */
+}
+
+#endif /* _RPCENDPOINT_H_ */
