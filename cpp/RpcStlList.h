@@ -32,6 +32,20 @@ template<class T> struct TypeInfo<std::forward_list<T>>: StlCollection<T>
 
         return false;
     }
+
+    template<class C> static constexpr inline size_t size(const C& v) 
+    {       
+        size_t contentSize = 0;
+        uint32_t count = 0;
+
+        for(const auto &x: v)
+        {
+            contentSize += TypeInfo<T>::size(x);
+            count++;
+        }
+
+        return contentSize + VarUint4::size(count);
+    }
 };
 
 }

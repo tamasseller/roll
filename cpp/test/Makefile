@@ -13,7 +13,7 @@ CXXFLAGS += -O0 -g3
 CXXFLAGS += --std=c++17
 CXXFLAGS += -fno-inline
 CXXFLAGS += -fmax-errors=5
-CXXFLAGS += -rdynamic 
+CXXFLAGS += -rdynamic
 CXXFLAGS += --coverage
 
 LDFLAGS += -rdynamic

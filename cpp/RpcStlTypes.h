@@ -11,16 +11,24 @@ template<class T> struct StlCollection: CollectionTypeBase<T>
 {
     template<class C> static constexpr inline size_t size(const C& v) 
     {
-        size_t ret = 0;
+        size_t contentSize = 0;
         uint32_t count = 0;
 
-        for(const auto &x: v)
+        if constexpr(TypeInfo<T>::isConstSize())
         {
-            ret += TypeInfo<T>::size(x);
-            count++;
+            count = v.size();
+            contentSize = count ? (count * TypeInfo<T>::size(*v.begin())) : 0;
+        }
+        else
+        {
+            for(const auto &x: v)
+            {
+                contentSize += TypeInfo<T>::size(x);
+                count++;
+            }
         }
 
-        return ret + VarUint4::size(count);
+        return contentSize + VarUint4::size(count);
     }
 
     template<class S, class C> static inline bool writeLengthAndContent(S& s, uint32_t count, const C& v) 

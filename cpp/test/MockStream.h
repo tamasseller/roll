@@ -13,10 +13,12 @@ public:
     class Accessor
     {
         friend MockStream;
-        char *ptr, *const end;
+        char *ptr = nullptr, *end = nullptr;
         inline Accessor(char* ptr, char* end): ptr(ptr), end(end) {}
 
     public:
+        inline Accessor() = default;
+        
         template<class T>
         bool write(const T& v)
         {
@@ -45,7 +47,6 @@ public:
             return false;
         }
 
-        template<class T>
         bool skip(size_t size)
         {
             if(size <= end - ptr)

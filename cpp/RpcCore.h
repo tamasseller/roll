@@ -25,7 +25,7 @@ class Core
 	struct Invoker: IInvoker
 	{
 		T target;
-		Invoker(T&& target): target(std::move(target)) {}
+		Invoker(T&& target): target(rpc::move(target)) {}
 		inline virtual ~Invoker() = default;
 
 		virtual bool invoke(Accessor &a) override {
@@ -57,13 +57,13 @@ public:
 
 	template<class... Args, class T>
 	inline bool addCallAt(CallId id, T&& call) {
-		return registry.add(id, Pointer<IInvoker>::template make<Invoker<T, Args...>>(std::move(call)));
+		return registry.add(id, Pointer<IInvoker>::template make<Invoker<T, Args...>>(rpc::move(call)));
 	}
 
 	template<class... Args, class T>
 	inline CallId add(T&& call) 
 	{
-		auto ptr = Pointer<IInvoker>::template make<Invoker<T, Args...>>(std::move(call));
+		auto ptr = Pointer<IInvoker>::template make<Invoker<T, Args...>>(rpc::move(call));
 
 		CallId id;
 
@@ -71,7 +71,7 @@ public:
 		{
 			id = maxId++;
 		}
-		while(!registry.add(id, std::move(ptr)));
+		while(!registry.add(id, rpc::move(ptr)));
 		
 		return id;
 	}
@@ -86,11 +86,11 @@ public:
 		using C = Call<NominalArgs...>;
 		C c{id};
 
-		auto size = determineSize<const C&, NominalArgs...>(c, std::forward<ActualArgs>(args)...);
+		auto size = determineSize<const C&, NominalArgs...>(c, rpc::forward<ActualArgs>(args)...);
 		auto pdu = StreamWriterFactory::build(size);
-		bool serOk = serialize<const C&, NominalArgs...>(pdu, c, std::forward<ActualArgs>(args)...);
+		bool serOk = serialize<const C&, NominalArgs...>(pdu, c, rpc::forward<ActualArgs>(args)...);
 		// assert(serOk);
-		return StreamWriterFactory::done(std::move(pdu));
+		return StreamWriterFactory::done(rpc::move(pdu));
 	}
 };
 

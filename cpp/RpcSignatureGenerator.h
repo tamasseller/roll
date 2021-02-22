@@ -1,7 +1,7 @@
 #ifndef COMMON_RPCRPCSIGNATUREGENERATOR_H_
 #define COMMON_RPCRPCSIGNATUREGENERATOR_H_
 
-#include <utility>
+#include "RpcUtility.h"
 
 namespace rpc {
 	

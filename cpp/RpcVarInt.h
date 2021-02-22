@@ -62,6 +62,22 @@ struct VarUint4
 			}
 		}
 	}
+
+	template<class S> static inline bool skip(S& s)
+	{
+		uint8_t d, nBytes = 0;
+
+		while(s.read(d))
+		{
+			if(++nBytes == 5)
+				return true;
+
+			if(!(d & 0x80))
+				return true;
+		}
+
+		return false;
+	}
 };
 
 }
