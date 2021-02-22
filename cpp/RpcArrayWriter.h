@@ -24,7 +24,7 @@ public:
     auto end() const { return data + length; }
 };
 
-template<class T> struct TypeInfo<ArrayWriter<T>>: StlCompatibleCollectionTypeBase<T> 
+template<class T> struct TypeInfo<ArrayWriter<T>>: StlCompatibleCollectionTypeBase<ArrayWriter<T>, T> 
 {
     template<class A> static inline bool write(A& a, const ArrayWriter<T> &v) 
     { 

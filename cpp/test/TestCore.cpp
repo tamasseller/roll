@@ -2,89 +2,18 @@
 #include "RpcStlArray.h"
 #include "RpcStlList.h"
 
-#include "MockStream.h"
+#include "MockCoreAdapters.h"
 
 #include "1test/Test.h"
 
-#include <map>
-
-TEST_GROUP(Core) 
-{
-    struct SelfContainedStreamWriter: MockStream, MockStream::Accessor {
-        SelfContainedStreamWriter(size_t s): MockStream(s), MockStream::Accessor(this->access()) {}
-    };
-
-    struct MockStreamWriterFactory
-    {
-        using Accessor = MockStream::Accessor;
-
-        static inline auto build(size_t s) { 
-            return SelfContainedStreamWriter(s); 
-        }
-
-        decltype(auto)static inline done(SelfContainedStreamWriter &&w) { 
-            return static_cast<MockStream&&>(w); 
-        }
-    };
-
-    template<class K, class V>
-    class Registry
-    {
-        std::map<K, V> lookupTable;
-
-    public:
-        inline bool remove(const K& k) 
-        {
-            auto it = lookupTable.find(k);
-
-            if(it == lookupTable.end())
-                return false;
-
-            lookupTable.erase(it);
-            return true;
-        }
-
-        inline bool add(const K& k, V&& v) 
-        {
-            auto it = lookupTable.find(k);
-
-            if(it != lookupTable.end())
-                return false;
-
-            return lookupTable.emplace(k, std::move(v)).second;
-        }
-
-        inline V* find(const K& k, bool &ok) 
-        {
-            auto it = lookupTable.find(k);
-
-            if(it == lookupTable.end())
-            {
-                ok = false;
-                return nullptr;
-            }
-            
-            ok = true;
-            return &it->second;
-        }
-    };
-
-    template<class T>
-    struct Pointer: std::unique_ptr<T> 
-    {
-        Pointer(std::unique_ptr<T> &&v): std::unique_ptr<T>(std::move(v)) {}
-
-        template<class U, class... Args>
-        static inline Pointer make(Args&&... args) {
-            return Pointer(std::unique_ptr<T>(new U(std::forward<Args>(args)...)));
-        }
-    };
-};
+TEST_GROUP(Core)  {};
 
 TEST(Core, AddCallAt)
 {
-    rpc::Core<MockStreamWriterFactory, Pointer, Registry> core;
-    auto call = core.buildCall<std::string>(69, std::string("asdqwe"));
+    rpc::Core<MockStreamWriterFactory, MockSmartPointer, MockRegistry> core;
+    bool buildOk;
+    auto call = core.buildCall<std::string>(buildOk, 69, std::string("asdqwe"));
+    CHECK(buildOk);
 
     bool done = false;
 
@@ -128,7 +57,7 @@ TEST(Core, AddCallAt)
 
 TEST(Core, Truncate)
 {
-    rpc::Core<MockStreamWriterFactory, Pointer, Registry> core;
+    rpc::Core<MockStreamWriterFactory, MockSmartPointer, MockRegistry> core;
 
     bool done = false;
     CHECK(core.addCallAt<std::list<std::vector<char>>>(69, [&done](auto str)
@@ -140,7 +69,9 @@ TEST(Core, Truncate)
 
     for(int i = 0; ; i++)
     {
-        auto call = core.buildCall<std::vector<std::string>>(69, std::vector<std::string>{"asd", "qwe"});
+        bool buildOk;
+        auto call = core.buildCall<std::vector<std::string>>(buildOk, 69, std::vector<std::string>{"asd", "qwe"});
+        CHECK(buildOk);
 
         if(call.truncateAt(i))
         {
@@ -160,7 +91,7 @@ TEST(Core, Truncate)
 
 TEST(Core, GenericInsert)
 {
-    rpc::Core<MockStreamWriterFactory, Pointer, Registry> core;
+    rpc::Core<MockStreamWriterFactory, MockSmartPointer, MockRegistry> core;
 
     bool a = false;
     int b = 0;
@@ -169,12 +100,17 @@ TEST(Core, GenericInsert)
     auto id1 = core.add([&a]() { a = true; });
     auto id2 = core.add<int, int>([&b](int x, int y) { b = x + y; });
 
-    auto call1 = core.buildCall(id1);
+    bool build1ok;
+    auto call1 = core.buildCall(build1ok, id1);
+    CHECK(build1ok);
+
     auto r1 = call1.access();
     CHECK(core.execute(r1));
     CHECK(a == true);
 
-    auto call2 = core.buildCall<int, int>(id2, 1, 2);
+    bool build2ok;
+    auto call2 = core.buildCall<int, int>(build2ok, id2, 1, 2);
+    CHECK(build2ok);
     auto r2 = call2.access();
     CHECK(core.execute(r2));
     CHECK(b == 3);

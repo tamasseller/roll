@@ -16,7 +16,11 @@ public:
     inline StreamReader(A accessor, uint32_t length): accessor(accessor), length(length) {};
 
     struct StreamEnd{};
-    auto end() { return StreamEnd{}; }
+    inline auto end() { return StreamEnd{}; }
+
+    inline auto size() const {
+        return length;
+    }
 
     class Cursor
     {
@@ -27,17 +31,26 @@ public:
         inline Cursor(const A &accessor, uint32_t remaining): accessor(accessor), remaining(remaining) {}
 
     public:
-        T operator*() 
+        inline bool read(T &v)
+        {
+            if(remaining)
+            {
+                --remaining;
+                return TypeInfo<T>::read(accessor, v);
+            }
+
+            return false;
+        }
+
+        inline T operator*() 
         {
             T v;
-            bool readOk = TypeInfo<T>::read(accessor, v);
-            // assert(readOk);
-            --remaining;
+            this->read(v);
             return v;
         };
 
-        auto& operator++() { return *this; }
-        bool operator!=(const StreamEnd&) { return remaining > 0; }
+        inline auto& operator++() { return *this; }
+        inline bool operator!=(const StreamEnd&) const { return remaining > 0; }
     };
     
     auto begin() { return Cursor(accessor, length); }

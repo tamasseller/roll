@@ -9,10 +9,10 @@
 
 namespace rpc {
 
-template<class T> struct TypeInfo<std::list<T>>: StlListBasedCollection<T> {};
-template<class T> struct TypeInfo<std::deque<T>>: StlListBasedCollection<T> {};
+template<class T> struct TypeInfo<std::list<T>>: StlListBasedCollection<std::list<T>, T> {};
+template<class T> struct TypeInfo<std::deque<T>>: StlListBasedCollection<std::deque<T>, T> {};
 
-template<class T> struct TypeInfo<std::forward_list<T>>: StlCollection<T> 
+template<class T> struct TypeInfo<std::forward_list<T>>: StlCollection<std::forward_list<T>, T> 
 {
     template<class S> static inline bool write(S& s, const std::forward_list<T>& v) {
         return TypeInfo::StlCollection::writeLengthAndContent(s, std::distance(v.begin(), v.end()), v);

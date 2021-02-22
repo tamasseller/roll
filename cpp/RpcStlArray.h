@@ -8,8 +8,8 @@
 
 namespace rpc {
 
-template<> struct TypeInfo<std::string>: StlArrayBasedCollection<char> {};
-template<class T> struct TypeInfo<std::vector<T>>: StlArrayBasedCollection<T> {};
+template<> struct TypeInfo<std::string>: StlArrayBasedCollection<std::string, char> {};
+template<class T> struct TypeInfo<std::vector<T>>: StlArrayBasedCollection<std::vector<T>, T> {};
 
 }
 

@@ -21,9 +21,9 @@ TEST_GROUP(SerDes)
     template<class... C>
     auto write(C&&... c)
     {
-        MockStream stream(rpc::determineSize<C...>(std::forward<C>(c)...));
+        MockStream stream(rpc::determineSize<rpc::remove_const_t<rpc::remove_reference_t<C>>...>(std::forward<C>(c)...));
         auto a = stream.access();
-        CHECK(rpc::serialize<C...>(a, std::forward<C>(c)...));
+        CHECK(rpc::serialize<rpc::remove_const_t<rpc::remove_reference_t<C>>...>(a, std::forward<C>(c)...));
         CHECK(!a.write('\0'));
         return std::move(stream);
     }
@@ -214,13 +214,13 @@ TEST(SerDes, Truncate)
 TEST(SerDes, NoSpace)
 {
     auto data = std::string("panzerkampfwagen");
-    auto s = rpc::determineSize(data);
+    auto s = rpc::determineSize<std::string>(data);
 
     for(int i = 0; i <= s; i++)
     {
         MockStream stream(i);
         auto a = stream.access();
-        bool sok = rpc::serialize(a, data);
+        bool sok = rpc::serialize<std::string>(a, data);
 
         if(i < s)
             CHECK(!sok);
@@ -399,12 +399,12 @@ TEST(SerDes, ArrayWriter)
     unsigned short exp[] = {0xb16b, 0x00b5};
     rpc::ArrayWriter<unsigned short> input(exp);
 
-    auto size = rpc::determineSize(input);
+    auto size = rpc::determineSize<decltype(input)>(input);
     for(auto i = 0u; i < size; i++)
     {
         MockStream stream(i);
         auto a = stream.access();
-        CHECK(!rpc::serialize(a, input));
+        CHECK(!rpc::serialize<decltype(input)>(a, input));
     }
 
     for(int i = 0; ; i++)
@@ -439,4 +439,31 @@ TEST(SerDes, CTStr)
     static constexpr auto ctstr = rpc::CTStr(str);
     auto data = write(ctstr.writer());
     CHECK(read(data, std::string(str)));
+}
+
+TEST(SerDes, StreamOverread)
+{
+    auto data = write(std::string("frob"));
+    auto b = data.access();
+    CHECK(rpc::deserialize<rpc::StreamReader<char, MockStream::Accessor>>(b, [](auto&& reader)
+    {
+        std::stringstream ss;
+
+        auto cursor = reader.begin();
+        for(auto i = 0u; i < reader.size(); i++)
+        {
+            char c;
+            CHECK(cursor.read(c));
+            ss << c;
+        }
+
+        CHECK(ss.str() == "frob");
+        
+        for(int i = 0; i < 100; i++)
+        {
+            char _;
+            CHECK(!cursor.read(_));
+            _ = *cursor;
+        }
+    }));
 }

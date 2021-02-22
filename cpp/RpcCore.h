@@ -13,9 +13,11 @@ template
 >
 class Core
 {
+protected:
 	using Accessor = typename StreamWriterFactory::Accessor;
 	using CallId = uint32_t;
 
+private:
 	struct IInvoker {
 		virtual bool invoke(Accessor &a) = 0;
 		inline virtual ~IInvoker() = default;
@@ -81,15 +83,14 @@ public:
 	}
 
 	template<class... NominalArgs, class... ActualArgs>
-	static inline auto buildCall(CallId id, ActualArgs&&... args)
+	static inline auto buildCall(bool &ok, CallId id, ActualArgs&&... args)
 	{
 		using C = Call<NominalArgs...>;
 		C c{id};
 
-		auto size = determineSize<const C&, NominalArgs...>(c, rpc::forward<ActualArgs>(args)...);
+		auto size = determineSize<C, NominalArgs...>(c, args...);
 		auto pdu = StreamWriterFactory::build(size);
-		bool serOk = serialize<const C&, NominalArgs...>(pdu, c, rpc::forward<ActualArgs>(args)...);
-		// assert(serOk);
+		ok = serialize<C, NominalArgs...>(pdu, c, rpc::forward<ActualArgs>(args)...);
 		return StreamWriterFactory::done(rpc::move(pdu));
 	}
 };

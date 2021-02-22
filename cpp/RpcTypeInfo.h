@@ -149,9 +149,9 @@ template<class T> struct CollectionTypeBase
 	static constexpr inline bool isConstSize() { return false; }
 };
 
-template<class T> struct StlCompatibleCollectionTypeBase: CollectionTypeBase<T>
+template<class C, class T> struct StlCompatibleCollectionTypeBase: CollectionTypeBase<T>
 { 
-    template<class C> static constexpr inline size_t size(const C& v) 
+    static constexpr inline size_t size(const C& v) 
     {
         size_t contentSize = 0;
         uint32_t count = 0;

@@ -55,28 +55,26 @@ namespace detail
 
 namespace detail
 {
-	template<class C>
-	static constexpr inline size_t getSize(C&& c) {
-		using Plain = typename rpc::remove_const_t<rpc::remove_reference_t<C>>;
-		return TypeInfo<Plain>::size(rpc::forward<C>(c));
+	template<class NominalArgs, class ActualArg>
+	static constexpr inline size_t getSize(const ActualArg& c) {
+		return TypeInfo<NominalArgs>::size(c);
 	}
 
-	template<class S, class C>
-	static constexpr inline size_t writeEntry(S& s, C&& c) {
-		using Plain = typename rpc::remove_const_t<rpc::remove_reference_t<C>>;
-		return TypeInfo<Plain>::write(s, rpc::forward<C>(c));
+	template<class NominalArgs, class ActualArg, class S>
+	static constexpr inline size_t writeEntry(S& s, ActualArg&& c) {
+		return TypeInfo<NominalArgs>::write(s, rpc::forward<ActualArg>(c));
 	}
 }
 
-template<class... Args>
-size_t determineSize(Args&&... args) {
-	return (detail::getSize(rpc::forward<Args>(args)) + ... + 0);
+template<class... NominalArgs, class... ActualArgs>
+size_t determineSize(const ActualArgs&... args) {
+	return (detail::getSize<NominalArgs>(args) + ... + 0);
 }
 
-template<class... Args, class S>
-bool serialize(S& s, Args&&... args)
+template<class... NominalArgs, class... ActualArgs, class S>
+bool serialize(S& s, ActualArgs&&... args)
 {
-	return (detail::writeEntry(s, rpc::forward<Args>(args)) && ... && true);
+	return (detail::writeEntry<NominalArgs>(s, rpc::forward<ActualArgs>(args)) && ... && true);
 }
 
 template<class... Args, class C, class S>

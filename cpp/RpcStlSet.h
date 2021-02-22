@@ -8,11 +8,11 @@
 
 namespace rpc {
 
-template<class T> struct TypeInfo<std::set<T>>: StlAssociativeCollection<T> {};
-template<class T> struct TypeInfo<std::multiset<T>>: StlAssociativeCollection<T> {};
+template<class T> struct TypeInfo<std::set<T>>: StlAssociativeCollection<std::set<T>, T> {};
+template<class T> struct TypeInfo<std::multiset<T>>: StlAssociativeCollection<std::multiset<T>, T> {};
 
-template<class T> struct TypeInfo<std::unordered_set<T>>: StlAssociativeCollection<T> {};
-template<class T> struct TypeInfo<std::unordered_multiset<T>>: StlAssociativeCollection<T> {};
+template<class T> struct TypeInfo<std::unordered_set<T>>: StlAssociativeCollection<std::unordered_set<T>, T> {};
+template<class T> struct TypeInfo<std::unordered_multiset<T>>: StlAssociativeCollection<std::unordered_multiset<T>, T> {};
 
 }
 

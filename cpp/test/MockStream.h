@@ -76,8 +76,10 @@ public:
         return false;
     }
 
+    MockStream() = default;
     MockStream(const MockStream&) = delete;
     MockStream(MockStream&&) = default;
+    MockStream& operator =(MockStream&&) = default;
     inline MockStream(size_t size): buffer(new char[size]), end(buffer.get() + size) {};
 };
 

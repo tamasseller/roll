@@ -8,11 +8,11 @@
 
 namespace rpc {
 
-template<class K, class V> struct TypeInfo<std::map<K, V>>: StlAssociativeCollection<std::pair<K, V>> {};
-template<class K, class V> struct TypeInfo<std::multimap<K, V>>: StlAssociativeCollection<std::pair<K, V>> {};
+template<class K, class V> struct TypeInfo<std::map<K, V>>: StlAssociativeCollection<std::map<K, V>, std::pair<K, V>> {};
+template<class K, class V> struct TypeInfo<std::multimap<K, V>>: StlAssociativeCollection<std::multimap<K, V>, std::pair<K, V>> {};
 
-template<class K, class V> struct TypeInfo<std::unordered_map<K, V>>: StlAssociativeCollection<std::pair<K, V>> {};
-template<class K, class V> struct TypeInfo<std::unordered_multimap<K, V>>: StlAssociativeCollection<std::pair<K, V>> {};
+template<class K, class V> struct TypeInfo<std::unordered_map<K, V>>: StlAssociativeCollection<std::unordered_map<K, V>, std::pair<K, V>> {};
+template<class K, class V> struct TypeInfo<std::unordered_multimap<K, V>>: StlAssociativeCollection<std::unordered_multimap<K, V>, std::pair<K, V>> {};
     
 }
 
