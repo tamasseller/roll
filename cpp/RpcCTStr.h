@@ -14,6 +14,8 @@ class CTStr
     template<size_t n> friend class CTStr;
     
 public:
+    static constexpr size_t strLength = length;
+
     template<size_t n1, size_t n2>
     constexpr CTStr(const CTStr<n1>& s1, const char(&arr)[n2]): data{0}
     {
@@ -22,7 +24,7 @@ public:
 		for(auto i = 0u; i < n1; i++)
 			data[i] = s1.data[i];
 
-		for(auto i = 0; i < n2; i++)
+		for(auto i = 0u; i < n2; i++)
 			data[n1 + i] = arr[i];
 	}
 
@@ -31,19 +33,16 @@ public:
         for(auto i = 0u; i < length + 1; i++)
 			data[i] = arr[i];
     }
-     
+
+    constexpr CTStr(const CTStr&) = default;
+
     constexpr operator const char *() const { return data; }
-    constexpr size_t size() const { return size; }   
+    constexpr size_t size() const { return size; }
     constexpr ArrayWriter<char> writer() const { return ArrayWriter<char>(data, length); }
 };
 
 template <size_t n1, size_t n2>
-static inline constexpr auto operator<<(const CTStr<n1>& s1, const CTStr<n2>& s2) {
-	return CTStr<n1 + n2>(s1, s2.data);
-}
-
-template <size_t n1, size_t n2>
-static inline constexpr auto operator<<(const CTStr<n1>& s1, const char(&a2)[n2]) {
+static inline constexpr CTStr<n1 + n2 - 1> operator<<(const CTStr<n1>& s1, const char(&a2)[n2]) {
 	return CTStr<n1 + n2 - 1>(s1, a2);
 }
 

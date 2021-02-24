@@ -17,9 +17,9 @@ TEST_GROUP(SignatureGenerator)
     {
         static constexpr auto ret = rpc::writeSignature<T...>(rpc::CTStr(""));
 
-        auto alt = rpc::writeSignature<T...>(rpc::CTStr(""));
+        auto alt = rpc::writeSignature<T...>(rpc::CTStr("alt"));
         CHECK((const char*)ret != (const char*)alt);
-        CHECK(std::string((const char*)alt) == std::string((const char*)ret));
+        CHECK(std::string((const char*)alt) == std::string("alt") + std::string((const char*)ret));
 
         std::stringstream ss;
         rpc::writeSignature<T...>(ss);

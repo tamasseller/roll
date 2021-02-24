@@ -112,6 +112,8 @@ template<> struct TypeInfo<unsigned long>
 
 template<> struct TypeInfo<unsigned long long> : TypeInfo<unsigned long> {};
 
+template<size_t n> class CTStr;
+
 template<class... Args>
 struct Call {
 	uint32_t id = -1u;

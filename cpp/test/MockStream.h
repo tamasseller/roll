@@ -23,7 +23,7 @@ public:
         bool write(const T& v)
         {
             static constexpr auto size = sizeof(T);
-            if(size <= end - ptr)
+            if(size <= size_t(end - ptr))
             {
                 memcpy(ptr, &v, size);
                 ptr += size;
@@ -37,7 +37,7 @@ public:
         bool read(T& v)
         {
             static constexpr auto size = sizeof(T);
-            if(size <= end - ptr)
+            if(size <= size_t(end - ptr))
             {
                 memcpy(&v, ptr, size);
                 ptr += size;
@@ -49,7 +49,7 @@ public:
 
         bool skip(size_t size)
         {
-            if(size <= end - ptr)
+            if(size <= size_t(end - ptr))
             {
                 ptr += size;
                 return true;
@@ -67,7 +67,7 @@ public:
     {
         auto start = buffer.get();
 
-        if(offset < end - start)
+        if(offset < size_t(end - start))
         {
             end = start + offset;
             return true;

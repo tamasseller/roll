@@ -4,7 +4,7 @@
 #include "ubiquitous/ConfigHelper.h"
 #include "ubiquitous/PrintfWriter.h"
 
-TRACE_WRITER(pet::PrintfWriter);
-GLOBAL_TRACE_POLICY(Information);
+TRACE_WRITER(pet::PrintfWriter)
+GLOBAL_TRACE_POLICY(All)
 
 #endif

@@ -216,7 +216,7 @@ TEST(SerDes, NoSpace)
     auto data = std::string("panzerkampfwagen");
     auto s = rpc::determineSize<std::string>(data);
 
-    for(int i = 0; i <= s; i++)
+    for(auto i = 0u; i <= s; i++)
     {
         MockStream stream(i);
         auto a = stream.access();
@@ -240,7 +240,7 @@ TEST(SerDes, VarUint4)
     {
         const auto s = rpc::VarUint4::size(n);
 
-        for(int i = 0; i < s; i++)
+        for(auto i = 0u; i < s; i++)
         {
             MockStream stream(i);
             auto a = stream.access();
@@ -359,7 +359,7 @@ TEST(SerDes, StreamClobber)
 
     for(int i = 0; ; i++)
     {
-        auto data = write(exp, (bool)(i & 1 == 0));
+        auto data = write(exp, (bool)((i & 1) == 0));
 
         bool truncated = data.truncateAt(i);
         auto b = data.access();
@@ -368,8 +368,6 @@ TEST(SerDes, StreamClobber)
         bool executed = rpc::deserialize<rpc::StreamReader<std::pair<std::string, rpc::Call<>>, MockStream::Accessor>, bool>(b, 
         [&exp, &done, i](auto&& reader, bool f)
         {
-            auto e = exp.begin();
-
             auto elements = exp;
             for(const auto &x: reader)
             {
@@ -380,7 +378,7 @@ TEST(SerDes, StreamClobber)
             }
 
             CHECK(elements.size() == 0);
-            CHECK(f == (i & 1 == 0));
+            CHECK(f == ((i & 1) == 0));
             done = true;
         });
 

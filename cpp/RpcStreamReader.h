@@ -67,7 +67,7 @@ template<class T, class A> struct TypeInfo<StreamReader<T, A>>: CollectionTypeBa
 
         v = StreamReader<T, A>(a, count);
 
-        for(int i = 0; i < count; i++)
+        for(auto i = 0u; i < count; i++)
             if(!TypeInfo<T>::skip(a))
                 return false;
 

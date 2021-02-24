@@ -2,8 +2,10 @@
 #define _RPCENDPOINT_H_
 
 #include "RpcCore.h"
-#include "RpcStreamReader.h"
+#include "RpcCTStr.h"
+#include "RpcSymbol.h"
 #include "RpcArrayWriter.h"
+#include "RpcStreamReader.h"
 #include "RpcSignatureGenerator.h"
 
 #include <unordered_map>
@@ -13,11 +15,10 @@ namespace rpc {
 namespace detail 
 {
 	template<class> struct CallOperatorSignatureUtility;
+	template<class T> using Plain = remove_const_t<remove_reference_t<T>>;
 
 	template<class Type, class... Args> struct CallOperatorSignatureUtility<void (Type::*)(Args...) const>
 	{
-		template<class T> using Plain = remove_const_t<remove_reference_t<T>>;
-
 		template<class Core, class C>
 		static inline decltype(auto) install(Core &core, C&& c) {
 			return Call<Plain<Args>...>{core.template add<Plain<Args>...>(rpc::forward<C>(c))};
@@ -38,57 +39,55 @@ class Endpoint: Core<StreamWriterFactory, Pointer, Registry>, NameRegistry, publ
 	using CallId = typename Endpoint::Core::CallId;
 	static constexpr CallId lookupId = 0, invalidId = -1u;
 
+	bool doLookup(const char* name, size_t length, CallId cb)
+	{
+		bool buildOk;
+
+		auto data = this->Endpoint::Core::template buildCall<ArrayWriter<char>, Call<CallId>>(
+			buildOk, lookupId, ArrayWriter<char>(name, length), Call<CallId>{cb});	
+
+		if(buildOk)
+		{
+			if(IoEngine::send(rpc::move(data)))
+			{
+				return true;
+			}
+			else
+			{
+				// TODO Log: could not create lookup message
+			}
+		}
+		else
+		{
+			// TODO Log: could not send message
+		}
+
+		return false;
+	}
+
 public:
 	bool init()
 	{
 		return this->Endpoint::Core::template addCallAt<StreamReader<char, Accessor>, Call<CallId>>(lookupId, [this]
 		(StreamReader<char, Accessor> name, Call<CallId> callback)
 		{
-			auto nameQuery = this->beginQuery();
+			auto nameQuery = this->NameRegistry::beginQuery();
 
-			const auto length = name.size();
-			auto reader = name.begin();
-
-			bool ok = true;
-			for(auto i = 0u; i < length; i++)
-			{
-				char c;
-				if(!reader.read(c))
-				{
-					// TODO Log: internal error
-					ok = false;
-					break;
-				}
-
+			for(char c: name)
 				nameQuery << c;
-			}
 
-			if(ok)
+			CallId result = invalidId;
+			if(!nameQuery.run(result))
 			{
-				CallId result = invalidId;
-				if(!nameQuery.run(result))
-				{
-					// TODO Log: unknown method looked up
-				}
-
-				if(!call(callback, result))
-				{
-					// TODO Log: failed to reply
-				}
+				// TODO Log: unknown method looked up
 			}
 
+			if(!call(callback, result))
+			{
+				// TODO Log: failed to reply
+			}
 		});
 	}
-
-	// template<class... CallArgs, class... InvokeArgs>
-	// inline auto call(const RpcCall<CallArgs...> &c, InvokeArgs&&... args)
-	// {
-	// 	auto argTuple = pet::Tuple<CallArgs...>::create(std::forward<InvokeArgs>(args)...);
-
-	// 	return static_cast<Child*>(this)->write([&](CallItem* ci) {
-	// 		rpcCore.makeCallItem(ci, c.id, std::move(argTuple));
-	// 	});
-	// }
 
 	using Endpoint::Core::execute;
 
@@ -122,25 +121,38 @@ public:
 		return true;
 	}
 
-#if 0
-	template<class N, class C>
-	inline constexpr bool provide(const N& name, C&& c)
+	template<size_t n, class... Args, class C>
+	inline auto provide(Symbol<n, Args...> sym, C&& c) 
 	{
-		auto sgn = detail::FullSignatureGenerator<C::operator()>::generateSignature(name);
-		return addMapping((const char*)sgn, c.id);
-	}
-
-	template<class NominalArgs..., class... ActualArgs>
-	inline constexpr bool call(Call<NominalArgs...> call, ActualArgs&&...)
-	{
+		auto &core = *((typename Endpoint::Core*)this);
+		auto id = core.template add<detail::Plain<Args>...>(rpc::forward<C>(c));
 		
+		auto &nameReg = *((NameRegistry*)this);
+		if(nameReg.addMapping((const char*)sym, id))
+			return true;
+		
+		// TODO uninstall
+		return false;
 	}
-#endif
 
-	// template<class... Args>
-	// inline auto install(pet::Delegate<void(Args...)>&& d) {
-	// 	return RpcCall<Args...>{rpcCore.registerCall(std::move(d))};
-	// }
+	template<size_t n, class... Args, class C>
+	inline auto lookup(const Symbol<n, Args...> &sym, C&& c) 
+	{
+		auto &core = *((typename Endpoint::Core*)this);
+		auto id = core.template add<CallId>([this, c{rpc::forward<C>(c)}](CallId id)
+		{
+			c(Call<Args...>{id});
+			// TODO uninstall
+		});
+
+		if(!doLookup((const char*)sym, n, id))
+		{
+			// TODO uninstall
+			return false;
+		}
+		
+		return true;
+	}
 
 	// template<class... Args>
 	// inline void uninstall(const RpcCall<Args...> &c)

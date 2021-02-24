@@ -31,7 +31,7 @@ template<class T> struct TypeInfo<ArrayWriter<T>>: StlCompatibleCollectionTypeBa
         if(!VarUint4::write(a, v.length))
             return false;
 
-        for(int i = 0; i < v.length; i++)
+        for(auto i = 0u; i < v.length; i++)
             if(!TypeInfo<T>::write(a, v.data[i]))
                 return false;
 
