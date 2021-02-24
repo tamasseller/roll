@@ -51,10 +51,7 @@ namespace detail
 		
 		return v;
 	}
-}
 
-namespace detail
-{
 	template<class NominalArgs, class ActualArg>
 	static constexpr inline size_t getSize(const ActualArg& c) {
 		return TypeInfo<NominalArgs>::size(c);
@@ -66,17 +63,29 @@ namespace detail
 	}
 }
 
+/**
+ * Helper method that determines the serialized size of the values passed 
+ * in args using the TypeInfo template class.
+ */
 template<class... NominalArgs, class... ActualArgs>
 size_t determineSize(const ActualArgs&... args) {
 	return (detail::getSize<NominalArgs>(args) + ... + 0);
 }
 
+/**
+ * Helper method that serializes the values passed in args into a stream 
+ * using the TypeInfo template class.
+ */
 template<class... NominalArgs, class... ActualArgs, class S>
 bool serialize(S& s, ActualArgs&&... args)
 {
 	return (detail::writeEntry<NominalArgs>(s, rpc::forward<ActualArgs>(args)) && ... && true);
 }
 
+/**
+ * Helper method that deserializes values from a stream and calls 
+ * a functor using them as arguments using the TypeInfo template class.
+ */
 template<class... Args, class C, class S>
 static inline auto deserialize(S& s, C&& c)
 {

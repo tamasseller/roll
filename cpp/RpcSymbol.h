@@ -6,7 +6,13 @@
 #include <stddef.h>
 
 namespace rpc {
-    
+
+/**
+ * Public identifier method identifer for remote lookup.
+ * 
+ * The Symbol represents a named method and its argument types.
+ * It can be used for registration and lookup of public methods.
+ */
 template<size_t n, class... Args>
 struct Symbol: CTStr<n>
 {
@@ -15,6 +21,11 @@ struct Symbol: CTStr<n>
     inline constexpr Symbol(const CTStr<n> &name): CTStr<n>(name) {}
 };
 
+/**
+ * Helper function to build Symbol objects.
+ * 
+ * It allows compile time construction of the method signature.
+ */
 template<class... Args, size_t n>
 inline constexpr auto symbol(const CTStr<n> &name)
 {

@@ -8,6 +8,11 @@
 
 namespace rpc {
 
+/**
+ * Serialization rules for std::tuple
+ * 
+ * NOTE: see AggregateTypeBase for generic rules of aggregate serialization.
+ */
 template<class... Types> struct TypeInfo<std::tuple<Types...>>: AggregateTypeBase<Types...>
 {
    	static constexpr inline size_t size(const std::tuple<Types...>& v)  {
@@ -23,6 +28,11 @@ template<class... Types> struct TypeInfo<std::tuple<Types...>>: AggregateTypeBas
     }
 };
 
+/**
+ * Serialization rules for std::pair
+ * 
+ * NOTE: see AggregateTypeBase for generic rules of aggregate serialization.
+ */
 template<class T1, class T2> struct TypeInfo<std::pair<T1, T2>>: AggregateTypeBase<T1, T2>
 {
 	static constexpr inline size_t size(const std::pair<T1, T2>& v)  {

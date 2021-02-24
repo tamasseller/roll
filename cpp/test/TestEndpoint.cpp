@@ -60,15 +60,31 @@ struct MockIoEngine
     }
 };
 
+struct MockLog
+{
+    static inline void write(const char* error) {
+        MOCK(Log)::CALL(write).withStringParam(error);
+    }
+};
+
 TEST_GROUP(Endpoint) 
 {
     using Uut = rpc::Endpoint<
+        MockLog,
         MockMethodDictionary, 
         MockIoEngine, 
         MockStreamWriterFactory, 
         MockSmartPointer, 
         MockRegistry
     >;
+
+    static inline void executeLoopback(Uut& uut) 
+    {
+        auto msg = rpc::move(uut.sent.front());
+        uut.sent.pop_front();
+        auto loopback = msg.access();
+        CHECK(uut.execute(loopback));
+    }
 };
 
 TEST(Endpoint, Hello)
@@ -83,10 +99,7 @@ TEST(Endpoint, Hello)
     });
 
     CHECK(uut.call(cb, "hello"));
-
-    auto loopback = uut.sent.front().access();
-    CHECK(uut.execute(loopback));
-
+    executeLoopback(uut);
     CHECK(n == 1);
 }
 
@@ -100,17 +113,18 @@ TEST(Endpoint, ProvideRequire)
     CHECK(uut.provide(sym, [&uut](auto x, auto callback) {}));
 
     bool done = false;
-    CHECK(uut.lookup(sym, [&done](auto sayHello)
+    CHECK(uut.lookup(sym, [&done](bool lookupSucced, auto sayHello)
     {
+        CHECK(lookupSucced);
+
         (rpc::Call<uint32_t, rpc::Call<std::string>>)sayHello;
         CHECK(sayHello.id == 1);
         done = true;
     }));
 
-    auto msg = rpc::move(uut.sent.front());
-    uut.sent.pop_front();
-    auto loopback = msg.access();
-    CHECK(uut.execute(loopback));
+    for(int i = 0; i < 2; i++)
+    executeLoopback(uut);
+    CHECK(done);
 }
 
 TEST(Endpoint, ExecuteRemoteWithCallback)
@@ -126,8 +140,11 @@ TEST(Endpoint, ExecuteRemoteWithCallback)
             CHECK(uut.call(callback, "hello"));
     }));
 
-    CHECK(uut.lookup(sym, [&uut](auto sayHello)
+    bool done = false;
+    CHECK(uut.lookup(sym, [&done, &uut](bool lookupSucceded, auto sayHello)
     {
+        CHECK(lookupSucceded);
+
         int n = 0;
         rpc::Call<std::string> cb = uut.install([&n](const std::string &str) {
             CHECK(str == "hello");
@@ -137,20 +154,14 @@ TEST(Endpoint, ExecuteRemoteWithCallback)
         CHECK(uut.call(sayHello, 3, cb));
 
         for(int i = 0; i < 4; i++)
-        {
-            auto msg = rpc::move(uut.sent.front());
-            uut.sent.pop_front();
-            auto loopback = msg.access();
-            CHECK(uut.execute(loopback));
-        }
+            executeLoopback(uut);
 
-        CHECK(n == 4);
+        CHECK(n == 3);
+        done = true;
     }));
 
-    {
-        auto msg = rpc::move(uut.sent.front());
-        uut.sent.pop_front();
-        auto loopback = msg.access();
-        CHECK(uut.execute(loopback));
-    }
+    for(int i=0; i<2; i++)
+        executeLoopback(uut);
+
+    CHECK(done);
 }

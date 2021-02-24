@@ -9,6 +9,24 @@
 
 namespace rpc {
 
+/**
+ * Transferable remote procedure handle.
+ * 
+ * It is used to identify a method for the purpose of remotely initiated
+ * invocation. A Call object can be acquired by symbol based lookup from
+ * the remote end and it can also be created locally by installing a method
+ * that can be executed later by the remote end.
+ */
+template<class... Args>
+struct Call {
+	uint32_t id = -1u;
+};
+
+/**
+ * Serialization rules for boolean values.
+ * 
+ * A bool value is encoded as a single byte with a value of 0 for false and 1 for true.
+ */
 template<> struct TypeInfo<bool> { 
 	static_assert(sizeof(bool) == 1);
 	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { return s << "b"; }
@@ -19,6 +37,11 @@ template<> struct TypeInfo<bool> {
 	static constexpr inline bool isConstSize() { return true; }
 };
 
+/**
+ * Serialization rules for char values.
+ * 
+ * A char value is encoded as a single byte.
+ */
 template<> struct TypeInfo<char> { 
 	static_assert(sizeof(char) == 1);
 	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { return s << "i1"; }
@@ -29,8 +52,18 @@ template<> struct TypeInfo<char> {
 	static constexpr inline bool isConstSize() { return true; }
 };
 
+/**
+ * Serialization rules for signed char values.
+ * 
+ * A signed char value is encoded the same way as a char value (are they actually the same?)
+ */
 template<> struct TypeInfo<signed char>: TypeInfo<char> {};
 
+/**
+ * Serialization rules for unsigned char values.
+ * 
+ * A unsigned char value is encoded as a single byte.
+ */
 template<> struct TypeInfo<unsigned char> 
 { 
 	static_assert(sizeof(unsigned char) == 1);
@@ -42,6 +75,11 @@ template<> struct TypeInfo<unsigned char>
 	static constexpr inline bool isConstSize() { return true; }
 };
 
+/**
+ * Serialization rules for signed short values.
+ * 
+ * A signed short value is encoded as two bytes in little endian (LSB first) order.
+ */
 template<> struct TypeInfo<signed short> 
 {
 	static_assert(sizeof(signed short) == 2);
@@ -53,6 +91,11 @@ template<> struct TypeInfo<signed short>
 	static constexpr inline bool isConstSize() { return true; }
 };
 
+/**
+ * Serialization rules for unsigned short values.
+ * 
+ * A unsigned short value is encoded as two bytes in little endian (LSB first) order.
+ */
 template<> struct TypeInfo<unsigned short> 
 {
 	static_assert(sizeof(unsigned short) == 2);
@@ -64,6 +107,11 @@ template<> struct TypeInfo<unsigned short>
 	static constexpr inline bool isConstSize() { return true; }
 };
 
+/**
+ * Serialization rules for signed int values.
+ * 
+ * A signed int value is encoded as four bytes in little endian (LSB first) order.
+ */
 template<> struct TypeInfo<signed int> 
 {
 	static_assert(sizeof(signed int) == 4);
@@ -75,6 +123,11 @@ template<> struct TypeInfo<signed int>
 	static constexpr inline bool isConstSize() { return true; }
 };
 
+/**
+ * Serialization rules for unsigned int values.
+ * 
+ * A unsigned int value is encoded as four bytes in little endian (LSB first) order.
+ */
 template<> struct TypeInfo<unsigned int> 
 { 
 	static_assert(sizeof(unsigned int) == 4);
@@ -86,6 +139,11 @@ template<> struct TypeInfo<unsigned int>
 	static constexpr inline bool isConstSize() { return true; }
 };
 
+/**
+ * Serialization rules for signed long values.
+ * 
+ * A signed long value is encoded as eight bytes in little endian (LSB first) order.
+ */
 template<> struct TypeInfo<signed long> 
 {
 	static_assert(sizeof(signed long) == 8);
@@ -97,8 +155,18 @@ template<> struct TypeInfo<signed long>
 	static constexpr inline bool isConstSize() { return true; }
 };
 
+/**
+ * Serialization rules for signed long long values.
+ * 
+ * A signed long value is encoded the same way as a signed long value (are they actually the same?)
+ */
 template<> struct TypeInfo<signed long long> : TypeInfo<signed long> {};
 
+/**
+ * Serialization rules for unsigned long values.
+ * 
+ * A unsigned long value is encoded as eight bytes in little endian (LSB first) order.
+ */
 template<> struct TypeInfo<unsigned long> 
 { 
 	static_assert(sizeof(unsigned long) == 8);
@@ -110,15 +178,20 @@ template<> struct TypeInfo<unsigned long>
 	static constexpr inline bool isConstSize() { return true; }
 };
 
+/**
+ * Serialization rules for unsigned long long values.
+ * 
+ * A unsigned long value is encoded the same way as a unsigned long value (are they actually the same?)
+ */
 template<> struct TypeInfo<unsigned long long> : TypeInfo<unsigned long> {};
 
 template<size_t n> class CTStr;
 
-template<class... Args>
-struct Call {
-	uint32_t id = -1u;
-};
-
+/**
+ * Serialization rules for Call objects.
+ * 
+ * The call object's 32 bit identifier field is encoded using variable length encoding.
+ */
 template<class... Args> struct TypeInfo<Call<Args...>> 
 {
 	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { return writeSignature<Args...>(s); }
@@ -129,6 +202,12 @@ template<class... Args> struct TypeInfo<Call<Args...>>
 	static constexpr inline bool isConstSize() { return false; }
 };
 
+/**
+ * Common serialization rules for all collection objects.
+ * 
+ * A collection's length is written first using variable length encoding 
+ * then the elements of the collection are written one after the other.
+ */
 template<class T> struct CollectionTypeBase
 { 
 	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { 
@@ -151,6 +230,11 @@ template<class T> struct CollectionTypeBase
 	static constexpr inline bool isConstSize() { return false; }
 };
 
+/**
+ * Common serialization rules for STL-like containers.
+ * 
+ * NOTE: see CollectionTypeBase for generic rules of collection serialization.
+ */
 template<class C, class T> struct StlCompatibleCollectionTypeBase: CollectionTypeBase<T>
 { 
     static constexpr inline size_t size(const C& v) 
@@ -176,6 +260,11 @@ template<class C, class T> struct StlCompatibleCollectionTypeBase: CollectionTyp
     }
 };
 
+/**
+ * Common serialization rules for struct or tuple like (aggregate) object.
+ * 
+ * An aggregate is encoded simply as its members one after the other.
+ */
 template<class... Types> struct AggregateTypeBase 
 {
 	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { 

@@ -11,21 +11,40 @@ namespace detail
     template<class T> struct is_lvalue_reference<T&>: public true_type { };
 }
 
+/**
+ * Same as std::remove_reference, re-implemented for dependency purposes.
+ */
 template<class T> struct remove_reference { typedef T type; };
 template<class T> struct remove_reference<T&> { typedef T type; };
 template<class T> struct remove_reference<T&&> { typedef T type; };
+
+/**
+ * Same as std::remove_reference_t, re-implemented for dependency purposes.
+ */
 template<class T> using remove_reference_t = typename remove_reference<T>::type;
 
+/**
+ * Same as std::remove_const, re-implemented for dependency purposes.
+ */
 template<class T> struct remove_const { using type = T; };
 template<class T> struct remove_const<const T> { using type = T;  };
+
+/**
+ * Same as std::remove_const_t, re-implemented for dependency purposes.
+ */
 template<class T> using remove_const_t = typename remove_const<T>::type;
 
-
+/**
+ * Same as std::forward, re-implemented for dependency purposes.
+ */
 template<typename T>
 static inline constexpr T&& forward(remove_reference_t<T>& t) {
     return static_cast<T&&>(t);
 }
 
+/**
+ * Same as std::forward, re-implemented for dependency purposes.
+ */
 template<typename T>
 static inline constexpr T&& forward(remove_reference_t<T>&& t)
 {
@@ -33,6 +52,9 @@ static inline constexpr T&& forward(remove_reference_t<T>&& t)
     return static_cast<T&&>(t);
 }
 
+/**
+ * Same as std::move, re-implemented for dependency purposes.
+ */
 template<typename T>
 constexpr remove_reference_t<T>&& move(T&& t) {
     return static_cast<remove_reference_t<T>&&>(t);

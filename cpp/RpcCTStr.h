@@ -7,6 +7,11 @@
 
 namespace rpc {
 
+/**
+ * Compile Time String.
+ * 
+ * Helper class used for generation of method signatures.
+ */
 template<size_t length>
 class CTStr
 {

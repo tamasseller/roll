@@ -6,6 +6,11 @@
 
 namespace rpc {
 
+/**
+ * Variable length encoding for unsigned 32 bit values.
+ * 
+ * Uses little endian base 128 (LEB128) encoding. 
+ */
 struct VarUint4
 {
 	static constexpr inline size_t size(uint32_t c) 

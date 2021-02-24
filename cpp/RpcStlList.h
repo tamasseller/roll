@@ -9,9 +9,25 @@
 
 namespace rpc {
 
+/**
+ * Serialization rules for std::list.
+ * 
+ * NOTE: see CollectionTypeBase for generic rules of collection serialization.
+ */
 template<class T> struct TypeInfo<std::list<T>>: StlListBasedCollection<std::list<T>, T> {};
+
+/**
+ * Serialization rules for std::deque.
+ * 
+ * NOTE: see CollectionTypeBase for generic rules of collection serialization.
+ */
 template<class T> struct TypeInfo<std::deque<T>>: StlListBasedCollection<std::deque<T>, T> {};
 
+/**
+ * Serialization rules for std::forward_list.
+ * 
+ * NOTE: see CollectionTypeBase for generic rules of collection serialization.
+ */
 template<class T> struct TypeInfo<std::forward_list<T>>: StlCollection<std::forward_list<T>, T> 
 {
     template<class S> static inline bool write(S& s, const std::forward_list<T>& v) {
