@@ -86,11 +86,11 @@ bool serialize(S& s, ActualArgs&&... args)
  * Helper method that deserializes values from a stream and calls 
  * a functor using them as arguments using the TypeInfo template class.
  */
-template<class... Args, class C, class S>
-static inline auto deserialize(S& s, C&& c)
+template<class... Args, class... ExtraArgs, class C, class S>
+static inline auto deserialize(S& s, C&& c, ExtraArgs&&... extraArgs)
 {
 	bool ok = true;
-	detail::CallHelper{rpc::forward<C>(c), detail::readNext<Args>(s, ok)..., ok};
+	detail::CallHelper{rpc::forward<C>(c), rpc::forward<ExtraArgs>(extraArgs)..., detail::readNext<Args>(s, ok)..., ok};
 	return ok;
 }
 

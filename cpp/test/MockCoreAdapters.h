@@ -13,7 +13,16 @@ struct MockStreamWriterFactory
 {
     using Accessor = MockStream::Accessor;
 
-    static inline auto build(size_t s) { 
+    static inline int failAt = 0;
+
+    static inline auto build(size_t s) 
+    {
+        if(failAt > 0)
+        {
+            if(--failAt == 0)
+                return SelfContainedStreamWriter(0);
+        }
+
         return SelfContainedStreamWriter(s); 
     }
 

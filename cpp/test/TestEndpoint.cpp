@@ -54,7 +54,16 @@ struct MockIoEngine
 {
     std::list<MockStream> sent;
 
-    inline bool send(MockStream &&s) {
+    int failAt = 0;
+
+    inline bool send(MockStream &&s) 
+    {
+        if(failAt > 0)
+        {
+            if(--failAt == 0)
+                return false;
+        }
+        
         sent.emplace_back(std::move(s));
         return true;
     }
@@ -83,17 +92,17 @@ TEST_GROUP(Endpoint)
         auto msg = rpc::move(uut.sent.front());
         uut.sent.pop_front();
         auto loopback = msg.access();
-        CHECK(uut.execute(loopback));
+        CHECK(uut.process(loopback));
     }
 };
 
 TEST(Endpoint, Hello)
 {
     Uut uut;
-    uut.init();
+    CHECK(uut.init());
 
     int n = 0;
-    rpc::Call<std::string> cb = uut.install([&n](const std::string &str) {
+    rpc::Call<std::string> cb = uut.install([&n](Uut &uut, rpc::MethodHandle h, const std::string &str) {
         CHECK(str == "hello");
         n++;
     });
@@ -106,14 +115,14 @@ TEST(Endpoint, Hello)
 TEST(Endpoint, ProvideRequire)
 {
     Uut uut;
-    uut.init();
+    CHECK(uut.init());
 
     constexpr auto sym = rpc::symbol<uint32_t, rpc::Call<std::string>>(rpc::CTStr("symbol"));
 
-    CHECK(uut.provide(sym, [&uut](auto x, auto callback) {}));
+    CHECK(uut.provide(sym, [](Uut &uut, rpc::MethodHandle id, auto x, auto callback) {}));
 
     bool done = false;
-    CHECK(uut.lookup(sym, [&done](bool lookupSucced, auto sayHello)
+    CHECK(uut.lookup(sym, [&done](Uut &uut, bool lookupSucced, auto sayHello)
     {
         CHECK(lookupSucced);
 
@@ -127,26 +136,43 @@ TEST(Endpoint, ProvideRequire)
     CHECK(done);
 }
 
+TEST(Endpoint, DoubleProvide)
+{
+    Uut uut;
+    CHECK(uut.init());
+
+    constexpr auto sym = rpc::symbol<long>(rpc::CTStr("you-only-provide-once"));
+    CHECK(uut.provide(sym, [](auto &uut, auto id, auto x){}));
+    CHECK(!uut.provide(sym, [](auto &uut, auto id, auto x){}));
+}
+
+TEST(Endpoint, DoubleInit)
+{
+    Uut uut;
+    CHECK(uut.init());
+    CHECK(!uut.init());
+}
+
 TEST(Endpoint, ExecuteRemoteWithCallback)
 {
     Uut uut;
-    uut.init();
+    CHECK(uut.init());
 
     constexpr auto sym = rpc::symbol<uint32_t, rpc::Call<std::string>>(rpc::CTStr("say-hello"));
 
-    CHECK(uut.provide(sym, [&uut](auto x, auto callback)
+    CHECK(uut.provide(sym, [](auto &uut, auto id, auto x, auto callback)
     {
         for(auto i = 0u; i < x; i++)
             CHECK(uut.call(callback, "hello"));
     }));
 
     bool done = false;
-    CHECK(uut.lookup(sym, [&done, &uut](bool lookupSucceded, auto sayHello)
+    CHECK(uut.lookup(sym, [&done](Uut& uut, bool lookupSucceded, auto sayHello)
     {
         CHECK(lookupSucceded);
 
         int n = 0;
-        rpc::Call<std::string> cb = uut.install([&n](const std::string &str) {
+        rpc::Call<std::string> cb = uut.install([&n](Uut &uut, rpc::MethodHandle id, const std::string &str) {
             CHECK(str == "hello");
             n++;
         });
@@ -165,3 +191,127 @@ TEST(Endpoint, ExecuteRemoteWithCallback)
 
     CHECK(done);
 }
+
+TEST(Endpoint, LookupTotallyUnknownMethod)
+{
+    Uut uut;
+    CHECK(uut.init());
+
+    constexpr auto sym = rpc::symbol<uint32_t>(rpc::CTStr("non-existent"));
+
+    bool done = false;
+    CHECK(uut.lookup(sym, [&done](auto &uut, bool lookupSucceded, auto)
+    {
+        CHECK(!lookupSucceded);
+        done = true;
+    }));  
+
+    MOCK(Log)::EXPECT(write).withStringParam(rpc::Errors::unknownMethodRequested);
+
+    for(int i=0; i<2; i++)
+        executeLoopback(uut);
+
+    CHECK(done);
+}
+
+TEST(Endpoint, LookupMethodWithMistmatchedSignatureUnknownMethod)
+{
+    Uut uut;
+    CHECK(uut.init());
+
+    constexpr auto defsym = rpc::symbol<std::string>(rpc::CTStr("almost"));
+
+    CHECK(uut.provide(defsym, [](auto &uut, auto id, auto x){}));
+
+    constexpr auto lookupsym = rpc::symbol<int>(rpc::CTStr("almost"));
+
+    bool done = false;
+    CHECK(uut.lookup(lookupsym, [&done](auto &uut, bool lookupSucceded, auto)
+    {
+        CHECK(!lookupSucceded);
+        done = true;
+    }));  
+
+    MOCK(Log)::EXPECT(write).withStringParam(rpc::Errors::unknownMethodRequested);
+
+    for(int i=0; i<2; i++)
+        executeLoopback(uut);
+
+    CHECK(done);
+}
+
+TEST(Endpoint, FailToSendLookup)
+{
+    Uut uut;
+    CHECK(uut.init());
+    bool done = false;
+
+    constexpr auto sym = rpc::symbol<>(rpc::CTStr("dont-care"));
+
+    uut.failAt = 1;
+
+    MOCK(Log)::EXPECT(write).withStringParam(rpc::Errors::couldNotSendLookupMessage);
+
+    CHECK(!uut.lookup(sym, [&done](auto &uut, bool lookupSucceded, auto sayHello){ done = true; }));  
+
+    CHECK(!done);
+}
+
+TEST(Endpoint, FailToSendLookupResponse)
+{
+    Uut uut;
+    CHECK(uut.init());
+    bool done = false;
+
+    constexpr auto sym = rpc::symbol<>(rpc::CTStr("dont-care"));
+
+    uut.failAt = 2;
+
+    MOCK(Log)::EXPECT(write).withStringParam(rpc::Errors::unknownMethodRequested);
+    MOCK(Log)::EXPECT(write).withStringParam(rpc::Errors::couldNotSendMessage);
+    MOCK(Log)::EXPECT(write).withStringParam(rpc::Errors::failedToReplyToLookup);
+
+    CHECK(uut.lookup(sym, [&done](auto &uut, bool lookupSucceded, auto sayHello){ done = true; }));
+    executeLoopback(uut);
+
+    CHECK(!done);
+}
+
+
+TEST(Endpoint, FailToCreateLookup)
+{
+    Uut uut;
+    CHECK(uut.init());
+    bool done = false;
+
+    constexpr auto sym = rpc::symbol<>(rpc::CTStr("dont-care"));
+
+    MockStreamWriterFactory::failAt = 1;
+
+    MOCK(Log)::EXPECT(write).withStringParam(rpc::Errors::couldNotCreateLookupMessage);
+
+    CHECK(!uut.lookup(sym, [&done](auto &uut, bool lookupSucceded, auto sayHello){ done = true; }));  
+
+    CHECK(!done);
+}
+
+TEST(Endpoint, FailToCreateLookupResponse)
+{
+    Uut uut;
+    CHECK(uut.init());
+    bool done = false;
+
+    constexpr auto sym = rpc::symbol<>(rpc::CTStr("dont-care"));
+
+    MockStreamWriterFactory::failAt = 2;
+
+    MOCK(Log)::EXPECT(write).withStringParam(rpc::Errors::unknownMethodRequested);
+    MOCK(Log)::EXPECT(write).withStringParam(rpc::Errors::couldNotCreateMessage);
+    MOCK(Log)::EXPECT(write).withStringParam(rpc::Errors::failedToReplyToLookup);
+
+    CHECK(uut.lookup(sym, [&done](auto &uut, bool lookupSucceded, auto sayHello){ done = true; }));
+    executeLoopback(uut);
+
+    CHECK(!done);
+}
+

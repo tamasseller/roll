@@ -16,7 +16,7 @@ namespace detail
 	template<class> struct CallOperatorSignatureUtility;
 	template<class T> using Plain = remove_const_t<remove_reference_t<T>>;
 
-	template<class Type, class... Args> struct CallOperatorSignatureUtility<void (Type::*)(Args...) const>
+	template<class Type, class Ctx1, class Ctx2, class... Args> struct CallOperatorSignatureUtility<void (Type::*)(Ctx1, Ctx2, Args...) const>
 	{
 		template<class Core, class C>
 		static inline decltype(auto) install(Core &core, C&& c) {
@@ -25,6 +25,9 @@ namespace detail
 	};
 }
 
+/**
+ * RPC engine frontend.
+ */
 template <
 	class Log,
 	class NameRegistry,
@@ -33,7 +36,13 @@ template <
 	template<class> class Pointer,
 	template<class, class> class Registry
 >
-class Endpoint: Log, Core<StreamWriterFactory, Pointer, Registry>, NameRegistry, public IoEngine
+class Endpoint:
+	Core<
+		StreamWriterFactory, 
+		Pointer, 
+		Registry, 
+		Endpoint<Log, NameRegistry, IoEngine, StreamWriterFactory, Pointer, Registry>&>, 
+	NameRegistry, Log, public IoEngine
 {
 	using Accessor = typename Endpoint::Core::Accessor;
 	using CallId = typename Endpoint::Core::CallId;
@@ -49,17 +58,13 @@ class Endpoint: Log, Core<StreamWriterFactory, Pointer, Registry>, NameRegistry,
 		if(buildOk)
 		{
 			if(IoEngine::send(rpc::move(data)))
-			{
 				return true;
-			}
-			else
-			{
-				this->Log::write(Errors::couldNotCreateLookupMessage);
-			}
+
+			this->Log::write(Errors::couldNotSendLookupMessage);
 		}
 		else
 		{
-			this->Log::write(Errors::couldNotSendLookupMessage);
+			this->Log::write(Errors::couldNotCreateLookupMessage);
 		}
 
 		return false;
@@ -73,24 +78,20 @@ public:
 	 */
 	bool init()
 	{
-		return this->Endpoint::Core::template addCallAt<StreamReader<char, Accessor>, Call<CallId>>(lookupId, [this]
-		(StreamReader<char, Accessor> name, Call<CallId> callback)
+		return this->Endpoint::Core::template addCallAt<StreamReader<char, Accessor>, Call<CallId>>(lookupId, []
+		(Endpoint& ep, MethodHandle id, StreamReader<char, Accessor> name, Call<CallId> callback)
 		{
-			auto nameQuery = this->NameRegistry::beginQuery();
+			auto nameQuery = ep.NameRegistry::beginQuery();
 
 			for(char c: name)
 				nameQuery << c;
 
 			CallId result = invalidId;
-			if(nameQuery.run(result))
-			{
-				if(!call(callback, result))
-					this->Log::write(Errors::failedToReplyToValidLookup);
-			}
-			else
-			{
-				this->Log::write(Errors::unknownMethodLookedUp);
-			}
+			if(!nameQuery.run(result))
+				ep.Log::write(Errors::unknownMethodRequested);
+
+			if(!ep.call(callback, result))
+				ep.Log::write(Errors::failedToReplyToLookup);
 		});
 	}
 
@@ -106,15 +107,26 @@ public:
 	 *  - IO error during reading or
 	 *  - Failure to find the requested method in the registry.
 	 */
-	using Endpoint::Core::execute;
+	bool process(Accessor& a) {
+		return Endpoint::Core::execute(a, *this);
+	}
 
 	/**
 	 * Register a private RPC method for remote execution.
 	 * 
 	 * The registration created this way is not public in the sense that it 
 	 * can not be looked up by the remote end using a name. However it can 
-	 * be used  for callbacks by sending the returned handle over to the 
+	 * be used for callbacks by sending the returned handle over to the 
 	 * remote end that can use it later to invoke the registered method.
+	 * 
+	 * The argument must be a functor object that accepts the following arguments:
+	 * 
+	 *   - first: a reference to the Endpoint object, that can be used to carry out further operations,
+	 *   - second: an rpc::MethodHandle opaque identifier that can be used to remove the
+	 *     registration (for example via the reference to the Endpoint object in the first 
+	 *     argument) during execution of the method itself,
+	 *   - the rest of the arguments are the ones received from the remote call the types of which are
+	 *     captured in the returned Call object.
 	 * 
 	 * Returns a Call method handle that can be used to execute the registered method.
 	 */
@@ -126,15 +138,26 @@ public:
 	}
 
 	/**
-	 * Removes a method registration.
+	 * Removes a method registration identified by an opaque handle supplied to the 
+	 * method at invocation.
+	 * 
+	 * Returns true if the method was removed, false if it could not be found.
+	 */
+	inline bool uninstall(const rpc::MethodHandle &h)
+	{
+		auto &core = *((typename Endpoint::Core*)this);
+		return core.removeCall(h.id);
+	}
+
+	/**
+	 * Removes a method registration identified by its Call object returned at 
+	 * registration.
 	 * 
 	 * Returns true if the method was removed, false if it could not be found.
 	 */
 	template<class... Args>
-	inline bool uninstall(const rpc::Call<Args...> &c)
-	{
-		auto &core = *((typename Endpoint::Core*)this);
-		return core.removeCall(c.id);
+	inline bool uninstall(const rpc::Call<Args...> &c) {
+		return uninstall(rpc::MethodHandle{c.id});
 	}
 
 	/**
@@ -156,11 +179,11 @@ public:
 			if(IoEngine::send(rpc::move(data)))
 				return true;
 
-			this->Log::write(Errors::couldNotSendUserMessage);
+			this->Log::write(Errors::couldNotSendMessage);
 		}
 		else
 		{
-			this->Log::write(Errors::couldNotCreateUserMessage);
+			this->Log::write(Errors::couldNotCreateMessage);
 		}
 
 		return false;
@@ -185,7 +208,7 @@ public:
 			return true;
 		
 		if(!core.removeCall(id))
-			this->Log::write(Errors::internalError);
+			this->Log::write(Errors::internalError); // GCOV_EXCL_LINE
 		
 		return false;
 	}
@@ -210,7 +233,7 @@ public:
 
 		auto &core = *((typename Endpoint::Core*)this);
 		if(!core.removeCall(id))
-			this->Log::write(Errors::internalError);
+			this->Log::write(Errors::internalError); // GCOV_EXCL_LINE
 		
 		return true;
 	}
@@ -222,8 +245,10 @@ public:
 	 * to the supplied functor when a reply is received. The functor is expected to
 	 * receive two arguments:
 	 * 
-	 *   - first: a bool value, which is true if the reply indicates success,
-	 *   - second: Call object that can be used to invoke the looked up remote method
+	 *   - first: a reference to the Endpoint object, that can be used to initiate
+	 *     further operations on the obtained result,
+	 *   - second: a bool value, which is true if the reply indicates success,
+	 *   - third: Call object that can be used to invoke the looked up remote method
 	 *     if the operation was successful (indicated by the first argument). If the
 	 * 	   reply indicates failure - probably because the queried symbol could not be 
 	 *     found remotely - then the value of the second argument must be considered
@@ -235,19 +260,19 @@ public:
 	inline auto lookup(const Symbol<n, Args...> &sym, C&& c) 
 	{
 		auto &core = *((typename Endpoint::Core*)this);
-		auto id = core.template add<CallId>([this, c{rpc::forward<C>(c)}](CallId id)
+		auto id = core.template add<CallId>([this, c{rpc::forward<C>(c)}](Endpoint &uut, rpc::MethodHandle handle, CallId result)
 		{
-			c(id != invalidId, Call<Args...>{id});
+			c(uut, result != invalidId, Call<Args...>{result});
 
 			auto &core = *((typename Endpoint::Core*)this);
-			if(!core.removeCall(id))
-				this->Log::write(Errors::internalError);
+			if(!core.removeCall(handle.id))
+				this->Log::write(Errors::internalError); // GCOV_EXCL_LINE
 		});
 
 		if(!doLookup((const char*)sym, n, id))
 		{
 			if(!core.removeCall(id))
-				this->Log::write(Errors::internalError);
+				this->Log::write(Errors::internalError); // GCOV_EXCL_LINE
 
 			return false;
 		}

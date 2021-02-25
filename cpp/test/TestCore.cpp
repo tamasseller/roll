@@ -21,7 +21,7 @@ TEST(Core, AddCallAt)
     CHECK(!core.execute(a));
     CHECK(!done);
 
-    CHECK(core.addCallAt<std::string>(69, [&done](std::string str)
+    CHECK(core.addCallAt<std::string>(69, [&done](rpc::MethodHandle id, std::string str)
     {
         CHECK(str == "asdqwe");
         done = true;
@@ -38,7 +38,7 @@ TEST(Core, AddCallAt)
     CHECK(core.execute(c));
     CHECK(done);
 
-    CHECK(!core.addCallAt<std::string>(69, [&done](std::string str) { CHECK(false); }));
+    CHECK(!core.addCallAt<std::string>(69, [&done](rpc::MethodHandle id, std::string str) { CHECK(false); }));
 
     done = false;
     auto d = call.access();
@@ -60,7 +60,7 @@ TEST(Core, Truncate)
     rpc::Core<MockStreamWriterFactory, MockSmartPointer, MockRegistry> core;
 
     bool done = false;
-    CHECK(core.addCallAt<std::list<std::vector<char>>>(69, [&done](auto str)
+    CHECK(core.addCallAt<std::list<std::vector<char>>>(69, [&done](rpc::MethodHandle id, auto str)
     {
         CHECK(str == std::list<std::vector<char>>{{'a', 's', 'd'}, {'q', 'w', 'e'}});
         CHECK(!done);
@@ -96,9 +96,9 @@ TEST(Core, GenericInsert)
     bool a = false;
     int b = 0;
 
-    core.addCallAt(0, [](){});
-    auto id1 = core.add([&a]() { a = true; });
-    auto id2 = core.add<int, int>([&b](int x, int y) { b = x + y; });
+    core.addCallAt(0, [](rpc::MethodHandle id){});
+    auto id1 = core.add([&a](auto id) { a = true; });
+    auto id2 = core.add<int, int>([&b](rpc::MethodHandle id, int x, int y) { b = x + y; });
 
     bool build1ok;
     auto call1 = core.buildCall(build1ok, id1);

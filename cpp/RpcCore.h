@@ -5,6 +5,10 @@
 
 namespace rpc {
 
+struct MethodHandle {
+	uint32_t id;
+};
+
 /**
  * RPC Call dispatcher.
  * 
@@ -17,7 +21,8 @@ template
 <
 	class StreamWriterFactory, 
 	template<class> class Pointer,
-	template<class, class> class Registry
+	template<class, class> class Registry,
+	class... ExtraArgs
 >
 class Core
 {
@@ -33,7 +38,7 @@ private:
 		/**
 		 * Deserialization and invocation of a registered method.
 		 */
-		virtual bool invoke(Accessor &a) = 0;
+		virtual bool invoke(Accessor &a, CallId id, ExtraArgs...) = 0;
 
 		/**
 		 * The virtual destructor is required because the captured 
@@ -73,8 +78,8 @@ private:
 		 * Uses deserializer helper to parse the arguments and pass them directly 
 		 * to the target method.
 		 */
-		virtual bool invoke(Accessor &a) override {
-			return deserialize<NominalArgs...>(a, target);
+		virtual bool invoke(Accessor &a, CallId id, ExtraArgs... extraArgs) override {
+			return deserialize<NominalArgs...>(a, target, extraArgs..., MethodHandle{id});
 		}
 	};
 
@@ -101,7 +106,7 @@ public:
 	 *   - Parse error during method identifier or argument parsing.
 	 *   - Failure to find the method registration corresponding to the identifier.
 	 */
-	bool execute(Accessor &a)
+	bool execute(Accessor &a, ExtraArgs... args)
 	{
 		CallId id;
 
@@ -113,7 +118,7 @@ public:
 		if(!ok)
 			return false;
 
-		return (*it)->invoke(a);
+		return (*it)->invoke(a, id, args...);
 	}
 
 	/**

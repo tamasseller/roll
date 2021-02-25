@@ -465,3 +465,19 @@ TEST(SerDes, StreamOverread)
         }
     }));
 }
+
+TEST(SerDes, ExtraArgs)
+{
+    auto data = write(std::string("normal"));
+    auto b = data.access();
+    bool done = false;
+
+    CHECK(rpc::deserialize<std::string>(b, [&done](auto extra, auto normal)
+    {
+        CHECK(normal == "normal");
+        CHECK(extra == "extra");
+        done = true;
+    }, std::string("extra")));
+
+    CHECK(done);
+}
