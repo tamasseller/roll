@@ -48,6 +48,34 @@ struct MockMethodDictionary
     bool addMapping(const char* name, uint32_t value) {
         return dict.insert({name, value}).second;
     }
+
+    bool removeMapping(const char* name, uint32_t &value) 
+    {
+        auto it = dict.find(name);
+
+        if(it != dict.end())
+        {
+            value = it->second;
+            dict.erase(it);
+            return true;
+        }
+
+        return false;
+    }
+
+    bool removeMapping(uint32_t value) 
+    {
+        for(auto it = dict.begin(); it != dict.end(); it++)
+        {
+            if(it->second == value)
+            {
+                dict.erase(it);
+                return true;
+            }
+        }
+
+        return false;
+    }
 };
 
 struct MockIoEngine
@@ -112,6 +140,14 @@ TEST(Endpoint, Hello)
     CHECK(n == 1);
 }
 
+TEST(Endpoint, NotHello)
+{
+    Uut uut;
+    CHECK(uut.init());
+    rpc::Call<std::string> cb = uut.install([](Uut &uut, rpc::MethodHandle h, const std::string &str) {});
+    CHECK(uut.uninstall(cb));
+}
+
 TEST(Endpoint, ProvideRequire)
 {
     Uut uut;
@@ -132,9 +168,80 @@ TEST(Endpoint, ProvideRequire)
     }));
 
     for(int i = 0; i < 2; i++)
-    executeLoopback(uut);
+        executeLoopback(uut);
+
     CHECK(done);
 }
+
+TEST(Endpoint, ProvideDiscardRequire)
+{
+    Uut uut;
+    CHECK(uut.init());
+
+    constexpr auto sym = rpc::symbol<uint32_t, rpc::Call<std::string>>(rpc::CTStr("symbol"));
+    CHECK(!uut.discard(sym));
+
+    CHECK(uut.provide(sym, [](Uut &uut, rpc::MethodHandle id, auto x, auto callback) {}));
+    CHECK(uut.discard(sym));
+
+    MOCK(Log)::EXPECT(write).withStringParam(rpc::Errors::unknownMethodRequested);
+
+    bool done = false;
+    CHECK(uut.lookup(sym, [&done](Uut &uut, bool lookupSucced, auto)
+    {
+        CHECK(!lookupSucced);
+        done = true;
+    }));
+
+    for(int i = 0; i < 2; i++)
+        executeLoopback(uut);
+
+    CHECK(!uut.discard(sym));
+
+    CHECK(done);
+}
+
+TEST(Endpoint, ProvideRequireRemovedFromCall)
+{
+    Uut uut;
+    CHECK(uut.init());
+
+    constexpr auto sym = rpc::symbol<>(rpc::CTStr("symbol"));
+    CHECK(uut.provide(sym, [](Uut &uut, rpc::MethodHandle id) {
+        uut.uninstall(id);
+    }));
+   
+    MOCK(Log)::EXPECT(write).withStringParam(rpc::Errors::unknownMethodRequested);
+
+    bool done1 = false;
+    CHECK(uut.lookup(sym, [&done1](Uut &uut, bool lookupSucced, auto result)
+    {
+        CHECK(lookupSucced);
+        CHECK(uut.call(result));
+        done1 = true;
+    }));
+
+    for(int i = 0; i < 2; i++)
+        executeLoopback(uut);
+
+    CHECK(done1);
+
+    executeLoopback(uut);
+    CHECK(!uut.discard(sym));
+
+    bool done2 = false;
+    CHECK(uut.lookup(sym, [&done2](Uut &uut, bool lookupSucced, auto)
+    {
+        CHECK(!lookupSucced);
+        done2 = true;
+    }));
+
+    for(int i = 0; i < 2; i++)
+        executeLoopback(uut);
+
+    CHECK(done2);
+}
+
 
 TEST(Endpoint, DoubleProvide)
 {
@@ -277,7 +384,6 @@ TEST(Endpoint, FailToSendLookupResponse)
     CHECK(!done);
 }
 
-
 TEST(Endpoint, FailToCreateLookup)
 {
     Uut uut;
@@ -314,4 +420,3 @@ TEST(Endpoint, FailToCreateLookupResponse)
 
     CHECK(!done);
 }
-

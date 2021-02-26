@@ -145,6 +145,9 @@ public:
 	 */
 	inline bool uninstall(const rpc::MethodHandle &h)
 	{
+		auto &nameReg = *((NameRegistry*)this);
+		nameReg.removeMapping(h.id);
+
 		auto &core = *((typename Endpoint::Core*)this);
 		return core.removeCall(h.id);
 	}
