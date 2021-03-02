@@ -1,0 +1,20 @@
+OUTPUT = rpc-cpp-interop-test
+
+SOURCES += main.cpp
+
+INCLUDE_DIRS += ..
+
+CXXFLAGS += -O0 -g3
+CXXFLAGS += --std=c++17
+CXXFLAGS += -fno-inline
+CXXFLAGS += -fmax-errors=5 -ftemplate-backtrace-limit=100
+CXXFLAGS += -Wall -Wpedantic -Werror -Wno-unused-value -Wreturn-local-addr
+CXXFLAGS += 
+
+LD=$(CXX)
+
+LIBS += pthread
+
+COVROOT = ..
+
+include ultimate-makefile/Makefile.ultimate

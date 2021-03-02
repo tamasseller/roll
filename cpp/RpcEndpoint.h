@@ -16,7 +16,7 @@ namespace detail
 	template<class> struct CallOperatorSignatureUtility;
 	template<class T> using Plain = remove_const_t<remove_reference_t<T>>;
 
-	template<class Type, class Ctx1, class Ctx2, class... Args> struct CallOperatorSignatureUtility<void (Type::*)(Ctx1, Ctx2, Args...) const>
+	template<class Ret, class Type, class Ctx1, class Ctx2, class... Args> struct CallOperatorSignatureUtility<Ret (Type::*)(Ctx1, Ctx2, Args...) const>
 	{
 		template<class Core, class C>
 		static inline decltype(auto) install(Core &core, C&& c) {
@@ -29,26 +29,24 @@ namespace detail
  * RPC engine frontend.
  */
 template <
-	class Log,
-	class NameRegistry,
-	class IoEngine,
-	class StreamWriterFactory, 
 	template<class> class Pointer,
-	template<class, class> class Registry
+	template<class, class> class Registry,
+	class NameRegistry,
+	class IoEngine
 >
 class Endpoint:
 	Core<
-		StreamWriterFactory, 
+		typename IoEngine::Factory, 
 		Pointer, 
 		Registry, 
-		Endpoint<Log, NameRegistry, IoEngine, StreamWriterFactory, Pointer, Registry>&>, 
-	NameRegistry, Log, public IoEngine
+		Endpoint<Pointer, Registry, NameRegistry, IoEngine>&>, 
+	NameRegistry, public IoEngine
 {
 	using Accessor = typename Endpoint::Core::Accessor;
 	using CallId = typename Endpoint::Core::CallId;
 	static constexpr CallId lookupId = 0, invalidId = -1u;
 
-	bool doLookup(const char* name, size_t length, CallId cb)
+	const char* doLookup(const char* name, size_t length, CallId cb)
 	{
 		bool buildOk;
 
@@ -58,19 +56,17 @@ class Endpoint:
 		if(buildOk)
 		{
 			if(IoEngine::send(rpc::move(data)))
-				return true;
+				return nullptr;
 
-			this->Log::write(Errors::couldNotSendLookupMessage);
-		}
-		else
-		{
-			this->Log::write(Errors::couldNotCreateLookupMessage);
+			return Errors::couldNotSendLookupMessage;
 		}
 
-		return false;
+		return Errors::couldNotCreateLookupMessage;
 	}
 
 public:
+	using IoEngine::IoEngine;
+
 	/**
 	 * Initialize the internal state of the RPC endpoint.
 	 * 
@@ -79,7 +75,7 @@ public:
 	bool init()
 	{
 		return this->Endpoint::Core::template addCallAt<StreamReader<char, Accessor>, Call<CallId>>(lookupId, []
-		(Endpoint& ep, MethodHandle id, StreamReader<char, Accessor> name, Call<CallId> callback)
+		(Endpoint& ep, const MethodHandle &id, StreamReader<char, Accessor> name, Call<CallId> callback)
 		{
 			auto nameQuery = ep.NameRegistry::beginQuery();
 
@@ -87,11 +83,15 @@ public:
 				nameQuery << c;
 
 			CallId result = invalidId;
-			if(!nameQuery.run(result))
-				ep.Log::write(Errors::unknownMethodRequested);
+			const char* ret = nullptr;
 
-			if(!ep.call(callback, result))
-				ep.Log::write(Errors::failedToReplyToLookup);
+			if(!nameQuery.run(ep, result))
+				ret = Errors::unknownMethodRequested;
+
+			if(auto err = ep.call(callback, result))
+				return err;
+
+			return ret;
 		});
 	}
 
@@ -107,7 +107,7 @@ public:
 	 *  - IO error during reading or
 	 *  - Failure to find the requested method in the registry.
 	 */
-	bool process(Accessor& a) {
+	auto process(Accessor& a) {
 		return Endpoint::Core::execute(a, *this);
 	}
 
@@ -141,55 +141,57 @@ public:
 	 * Removes a method registration identified by an opaque handle supplied to the 
 	 * method at invocation.
 	 * 
-	 * Returns true if the method was removed, false if it could not be found.
+	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
 	 */
-	inline bool uninstall(const rpc::MethodHandle &h)
+	inline const char* uninstall(const rpc::MethodHandle &h)
 	{
 		auto &nameReg = *((NameRegistry*)this);
 		nameReg.removeMapping(h.id);
 
 		auto &core = *((typename Endpoint::Core*)this);
-		return core.removeCall(h.id);
+
+		if(!core.removeCall(h.id))
+			return Errors::methodNotFound;
+
+		return nullptr;
 	}
 
 	/**
 	 * Removes a method registration identified by its Call object returned at 
 	 * registration.
 	 * 
-	 * Returns true if the method was removed, false if it could not be found.
+	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
 	 */
 	template<class... Args>
-	inline bool uninstall(const rpc::Call<Args...> &c) {
-		return uninstall(rpc::MethodHandle{c.id});
+	inline auto uninstall(const rpc::Call<Args...> &c) {
+		return uninstall(rpc::MethodHandle(c));
 	}
 
 	/**
 	 * Initiates a remote method call with the supplied parameters.
 	 * 
-	 * Returns true if the call was succesfully initiated, false on error.
+	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
 	 * The possible errors include:
 	 * 
 	 *  - Processign error during the serialization of the method identifier or arguments,
 	 *  - IO error during sending the request.
 	 */
 	template<class... NominalArgs, class... ActualArgs>
-	inline bool call(const Call<NominalArgs...> &call, ActualArgs&&... args)
+	inline const char* call(const Call<NominalArgs...> &call, ActualArgs&&... args)
 	{
 		bool buildOk;
 		auto data = this->Endpoint::Core::template buildCall<NominalArgs...>(buildOk, call.id, rpc::forward<ActualArgs>(args)...);	
 		if(buildOk)
 		{
 			if(IoEngine::send(rpc::move(data)))
-				return true;
+				return nullptr;
 
-			this->Log::write(Errors::couldNotSendMessage);
+			return Errors::couldNotSendMessage;
 		}
 		else
 		{
-			this->Log::write(Errors::couldNotCreateMessage);
+			return Errors::couldNotCreateMessage;
 		}
-
-		return false;
 	}
 
 	/**
@@ -198,22 +200,24 @@ public:
 	 * Registers the implementation of a public method identified by a Symbol object, 
 	 * that can be looked up by the remote end.
 	 * 
-	 * Returns true on success, false if an implementation is already registered for the Symbol.
+	 * The arguments of the functor are expected to be the same as described for the _install_ operation.
+	 *
+	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
 	 */
 	template<size_t n, class... Args, class C>
-	inline bool provide(Symbol<n, Args...> sym, C&& c) 
+	inline const char* provide(Symbol<n, Args...> sym, C&& c) 
 	{
 		auto &core = *((typename Endpoint::Core*)this);
 		auto id = core.template add<detail::Plain<Args>...>(rpc::forward<C>(c));
 		
 		auto &nameReg = *((NameRegistry*)this);
 		if(nameReg.addMapping((const char*)sym, id))
-			return true;
+			return nullptr;
 		
 		if(!core.removeCall(id))
-			this->Log::write(Errors::internalError); // GCOV_EXCL_LINE
+			return Errors::internalError; // GCOV_EXCL_LINE
 		
-		return false;
+		return Errors::symbolAlreadyExported;
 	}
 
 	/**
@@ -223,22 +227,22 @@ public:
 	 * After the operation the method can no longer be looked up or invoked using a handle
 	 * acquired earlier.
 	 * 
-	 * Returns true on success, false if there is no registration corresponding to the symbol.
+	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
 	 */
 	template<size_t n, class... Args>
-	inline bool discard(Symbol<n, Args...> sym) 
+	inline const char* discard(Symbol<n, Args...> sym) 
 	{
 		CallId id;
 		
 		auto &nameReg = *((NameRegistry*)this);
 		if(!nameReg.removeMapping((const char*)sym, id))
-			return false;
+			return Errors::noSuchSymbol;
 
 		auto &core = *((typename Endpoint::Core*)this);
 		if(!core.removeCall(id))
-			this->Log::write(Errors::internalError); // GCOV_EXCL_LINE
+			return Errors::internalError; // GCOV_EXCL_LINE
 		
-		return true;
+		return nullptr;
 	}
 
 	/**
@@ -257,30 +261,32 @@ public:
 	 *     found remotely - then the value of the second argument must be considered
 	 *     invalid and not be used for remote invocation.
 	 *      
-	 * Returns true if the query is successfully sent, false if there was an error.
+	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
 	 */
 	template<size_t n, class... Args, class C>
-	inline auto lookup(const Symbol<n, Args...> &sym, C&& c) 
+	inline const char* lookup(const Symbol<n, Args...> &sym, C&& c) 
 	{
 		auto &core = *((typename Endpoint::Core*)this);
-		auto id = core.template add<CallId>([this, c{rpc::forward<C>(c)}](Endpoint &uut, rpc::MethodHandle handle, CallId result)
+		auto id = core.template add<CallId>([this, c{rpc::forward<C>(c)}](Endpoint &uut, const rpc::MethodHandle &handle, CallId result) mutable
 		{
 			c(uut, result != invalidId, Call<Args...>{result});
 
 			auto &core = *((typename Endpoint::Core*)this);
 			if(!core.removeCall(handle.id))
-				this->Log::write(Errors::internalError); // GCOV_EXCL_LINE
+				return Errors::internalError; // GCOV_EXCL_LINE
+
+			return (const char*) nullptr;
 		});
 
-		if(!doLookup((const char*)sym, n, id))
+		if(auto err = doLookup((const char*)sym, n, id))
 		{
 			if(!core.removeCall(id))
-				this->Log::write(Errors::internalError); // GCOV_EXCL_LINE
+				return Errors::internalError; // GCOV_EXCL_LINE
 
-			return false;
+			return err;
 		}
 		
-		return true;
+		return nullptr;
 	}
 };
 

@@ -1,26 +1,13 @@
 #ifndef _RPCTYPEINFO_H_
 #define _RPCTYPEINFO_H_
 
-#include "RpcSignatureGenerator.h"
+#include "RpcCall.h"
 #include "RpcVarInt.h"
 
 #include <stddef.h>
 #include <stdint.h>
 
 namespace rpc {
-
-/**
- * Transferable remote procedure handle.
- * 
- * It is used to identify a method for the purpose of remotely initiated
- * invocation. A Call object can be acquired by symbol based lookup from
- * the remote end and it can also be created locally by installing a method
- * that can be executed later by the remote end.
- */
-template<class... Args>
-struct Call {
-	uint32_t id = -1u;
-};
 
 /**
  * Serialization rules for boolean values.

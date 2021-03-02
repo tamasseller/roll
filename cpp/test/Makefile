@@ -28,8 +28,6 @@ CXXFLAGS += -rdynamic
 CXXFLAGS += --coverage
 LDFLAGS += -rdynamic
 LIBS += gcov 
-ifeq (_,)
-endif
 
 LD=$(CXX)
 

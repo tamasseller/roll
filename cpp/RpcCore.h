@@ -5,10 +5,6 @@
 
 namespace rpc {
 
-struct MethodHandle {
-	uint32_t id;
-};
-
 /**
  * RPC Call dispatcher.
  * 
@@ -38,7 +34,7 @@ private:
 		/**
 		 * Deserialization and invocation of a registered method.
 		 */
-		virtual bool invoke(Accessor &a, CallId id, ExtraArgs...) = 0;
+		virtual const char* invoke(Accessor &a, CallId id, ExtraArgs...) = 0;
 
 		/**
 		 * The virtual destructor is required because the captured 
@@ -78,8 +74,8 @@ private:
 		 * Uses deserializer helper to parse the arguments and pass them directly 
 		 * to the target method.
 		 */
-		virtual bool invoke(Accessor &a, CallId id, ExtraArgs... extraArgs) override {
-			return deserialize<NominalArgs...>(a, target, extraArgs..., MethodHandle{id});
+		virtual const char* invoke(Accessor &a, CallId id, ExtraArgs... extraArgs) override {
+			return deserialize<NominalArgs...>(a, target, extraArgs..., MethodHandle(id));
 		}
 	};
 
@@ -106,17 +102,17 @@ public:
 	 *   - Parse error during method identifier or argument parsing.
 	 *   - Failure to find the method registration corresponding to the identifier.
 	 */
-	bool execute(Accessor &a, ExtraArgs... args)
+	const char* execute(Accessor &a, ExtraArgs... args)
 	{
 		CallId id;
 
 		if(!VarUint4::read(a, id))
-			return false;
+			return Errors::messageFormatError;
 
 		bool ok;
 		auto it = registry.find(id, ok);
 		if(!ok)
-			return false;
+			return Errors::wrongMethodRequest;
 
 		return (*it)->invoke(a, id, args...);
 	}

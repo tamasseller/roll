@@ -3,16 +3,35 @@
 
 #include "RpcTypeInfo.h"
 #include "RpcUtility.h"
+#include "RpcErrors.h"
 
 namespace rpc {
 
 namespace detail
 {
+	template<class> struct RetvalHelper;
+	
+	template<> struct RetvalHelper<void>
+	{
+		template<class V, class... A>
+		static inline constexpr const char* execute(V&& c, A&&... a) {
+			return c(rpc::forward<A>(a)...), nullptr;
+		}
+	};
+
+	template<> struct RetvalHelper<const char*>
+	{
+		template<class V, class... A>
+		static inline constexpr const char* execute(V&& c, A&&... a) {
+			return c(rpc::forward<A>(a)...);
+		}
+	};
+
 	template<class... Args> struct Stripped
 	{
 		template<class C>
-		static inline constexpr void call(C&& c, Args&&... args, bool &) {
-			c(rpc::forward<Args>(args)...);
+		static inline constexpr auto call(C&& c, Args&&... args, bool &) {
+			return RetvalHelper<decltype(c(rpc::forward<Args>(args)...))>::execute(rpc::forward<C>(c), rpc::forward<Args>(args)...);
 		}
 
 		template<class Next> using Prepend = Stripped<Next, Args...>;
@@ -29,12 +48,16 @@ namespace detail
 
 	struct CallHelper
 	{
+		const char* result = Errors::wrongMethodRequest;
+
 		template<class C, class... Types>
 		inline constexpr CallHelper(C&& c, Types&&... args) 
 		{
 			bool ok = (args, ...);
 			if(ok)
-				StripLast<Types...>::Result::template call<C>(rpc::forward<C>(c), rpc::forward<Types>(args)...);				
+				result = StripLast<Types...>::Result::template call<C>(rpc::forward<C>(c), rpc::forward<Types>(args)...);
+			else
+				result = Errors::messageFormatError;
 		}
 	};
 	
@@ -87,11 +110,10 @@ bool serialize(S& s, ActualArgs&&... args)
  * a functor using them as arguments using the TypeInfo template class.
  */
 template<class... Args, class... ExtraArgs, class C, class S>
-static inline auto deserialize(S& s, C&& c, ExtraArgs&&... extraArgs)
+static inline const char* deserialize(S& s, C&& c, ExtraArgs&&... extraArgs)
 {
 	bool ok = true;
-	detail::CallHelper{rpc::forward<C>(c), rpc::forward<ExtraArgs>(extraArgs)..., detail::readNext<Args>(s, ok)..., ok};
-	return ok;
+	return detail::CallHelper{rpc::forward<C>(c), rpc::forward<ExtraArgs>(extraArgs)..., detail::readNext<Args>(s, ok)..., ok}.result;
 }
 
 }

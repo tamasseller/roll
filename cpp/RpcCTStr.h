@@ -1,8 +1,6 @@
 #ifndef _RPCCTSTR_H_
 #define _RPCCTSTR_H_
 
-#include "RpcArrayWriter.h"
-
 #include <stddef.h>
 
 namespace rpc {
@@ -43,7 +41,19 @@ public:
 
     constexpr operator const char *() const { return data; }
     constexpr size_t size() const { return size; }
-    constexpr ArrayWriter<char> writer() const { return ArrayWriter<char>(data, length); }
+
+    template<size_t oLen>
+    constexpr bool operator ==(const CTStr<oLen>&o) const 
+    {
+        if(oLen != length)
+            return false;
+
+        for(auto i = 0u; i < oLen; i++)
+            if(o.data[i] != data[i])
+                return false;
+        
+        return true;
+    }
 };
 
 template <size_t n1, size_t n2>
