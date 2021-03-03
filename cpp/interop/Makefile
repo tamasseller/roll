@@ -1,6 +1,8 @@
 OUTPUT = rpc-cpp-interop-test
 
 SOURCES += main.cpp
+SOURCES += InteropTest.cpp
+SOURCES += Tcp.cpp
 
 INCLUDE_DIRS += ..
 
