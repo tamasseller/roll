@@ -10,9 +10,10 @@ TEST_GROUP(Core)  {};
 
 TEST(Core, AddCallAt)
 {
-    rpc::Core<MockStreamWriterFactory, MockSmartPointer, MockRegistry> core;
+    rpc::Core<MockStream::Accessor, MockSmartPointer, MockRegistry> core;
     bool buildOk;
-    auto call = core.buildCall<std::string>(buildOk, 69, std::string("asdqwe"));
+    MockStreamWriterFactory f1;
+    auto call = core.buildCall<std::string>(f1, buildOk, 69, std::string("asdqwe"));
     CHECK(buildOk);
 
     bool done = false;
@@ -57,7 +58,7 @@ TEST(Core, AddCallAt)
 
 TEST(Core, Truncate)
 {
-    rpc::Core<MockStreamWriterFactory, MockSmartPointer, MockRegistry> core;
+    rpc::Core<MockStream::Accessor, MockSmartPointer, MockRegistry> core;
 
     bool done = false;
     CHECK(core.addCallAt<std::list<std::vector<char>>>(69, [&done](const rpc::MethodHandle &id, auto str)
@@ -70,7 +71,8 @@ TEST(Core, Truncate)
     for(int i = 0; ; i++)
     {
         bool buildOk;
-        auto call = core.buildCall<std::vector<std::string>>(buildOk, 69, std::vector<std::string>{"asd", "qwe"});
+        MockStreamWriterFactory f2;
+        auto call = core.buildCall<std::vector<std::string>>(f2, buildOk, 69, std::vector<std::string>{"asd", "qwe"});
         CHECK(buildOk);
 
         if(call.truncateAt(i))
@@ -91,7 +93,7 @@ TEST(Core, Truncate)
 
 TEST(Core, GenericInsert)
 {
-    rpc::Core<MockStreamWriterFactory, MockSmartPointer, MockRegistry> core;
+    rpc::Core<MockStream::Accessor, MockSmartPointer, MockRegistry> core;
 
     bool a = false;
     int b = 0;
@@ -101,7 +103,8 @@ TEST(Core, GenericInsert)
     auto id2 = core.add<int, int>([&b](const rpc::MethodHandle &id, int x, int y) { b = x + y; });
 
     bool build1ok;
-    auto call1 = core.buildCall(build1ok, id1);
+    MockStreamWriterFactory f1;
+    auto call1 = core.buildCall(f1, build1ok, id1);
     CHECK(build1ok);
 
     auto r1 = call1.access();
@@ -109,7 +112,8 @@ TEST(Core, GenericInsert)
     CHECK(a == true);
 
     bool build2ok;
-    auto call2 = core.buildCall<int, int>(build2ok, id2, 1, 2);
+    MockStreamWriterFactory f2;
+    auto call2 = core.buildCall<int, int>(f2, build2ok, id2, 1, 2);
     CHECK(build2ok);
     auto r2 = call2.access();
     CHECK(nullptr == core.execute(r2));

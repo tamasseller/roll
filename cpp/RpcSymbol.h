@@ -35,5 +35,11 @@ inline constexpr auto symbol(const CTStr<n> &name)
     return Symbol<length, Args...>(sgn);
 }
 
+template<class... Args, size_t n>
+inline constexpr auto symbol(const Call<Args...>&, const CTStr<n> &name)
+{
+	return symbol<Args...>(name);
+}
+
 }
 #endif /* _RPCSYMBOL_H_ */

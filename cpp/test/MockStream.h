@@ -76,7 +76,7 @@ public:
         return false;
     }
 
-    MockStream() = default;
+    MockStream() = delete;
     MockStream(const MockStream&) = delete;
     MockStream(MockStream&&) = default;
     MockStream& operator =(MockStream&&) = default;

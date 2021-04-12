@@ -15,7 +15,7 @@ namespace rpc {
  */
 template
 <
-	class StreamWriterFactory, 
+	class Accessor,
 	template<class> class Pointer,
 	template<class, class> class Registry,
 	class... ExtraArgs
@@ -23,7 +23,6 @@ template
 class Core
 {
 protected:
-	using Accessor = typename StreamWriterFactory::Accessor;
 	using CallId = uint32_t;
 
 private:
@@ -165,16 +164,16 @@ public:
 	 * and arguments. Arguments are serialized using the serialize helper
 	 * according to the rules specified by the TypeInfo template class.
 	 */
-	template<class... NominalArgs, class... ActualArgs>
-	static inline auto buildCall(bool &ok, CallId id, ActualArgs&&... args)
+	template<class... NominalArgs, class... ActualArgs, class Factory>
+	static inline auto buildCall(Factory& factory, bool &ok, CallId id, ActualArgs&&... args)
 	{
 		using C = Call<NominalArgs...>;
 		C c{id};
 
 		auto size = determineSize<C, NominalArgs...>(c, args...);
-		auto pdu = StreamWriterFactory::build(size);
+		auto pdu = factory.build(size);
 		ok = serialize<C, NominalArgs...>(pdu, c, rpc::forward<ActualArgs>(args)...);
-		return StreamWriterFactory::done(rpc::move(pdu));
+		return factory.done(rpc::move(pdu));
 	}
 };
 

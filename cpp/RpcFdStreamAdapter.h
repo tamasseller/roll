@@ -35,9 +35,8 @@ public:
 
             friend class PreallocatedMemoryBufferStreamWriter;
 
-            inline Accessor(char* ptr, char* end): ptr(ptr), end(end) {}
-
         public:
+            inline Accessor(char* ptr, char* end): ptr(ptr), end(end) {}
             inline Accessor() = default;
             
             template<class T>
@@ -111,11 +110,11 @@ public:
 
 class FdStreamAdapter
 {
-    int wfd, rfd;
+    int wfd = -1, rfd = -1;
 public:
     using Factory = detail::PreallocatedMemoryBufferStreamWriterFactory;
 
-    inline FdStreamAdapter(const FdStreamAdapter&) = delete;
+    FdStreamAdapter(const FdStreamAdapter&) = delete;
     inline FdStreamAdapter(int wfd, int rfd): wfd(wfd), rfd(rfd) {}
 
     bool send(detail::PreallocatedMemoryBufferStream&& data)

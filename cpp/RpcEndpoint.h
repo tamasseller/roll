@@ -36,13 +36,13 @@ template <
 >
 class Endpoint:
 	Core<
-		typename IoEngine::Factory, 
+		typename IoEngine::Factory::Accessor,
 		Pointer, 
 		Registry, 
 		Endpoint<Pointer, Registry, NameRegistry, IoEngine>&>, 
 	NameRegistry, public IoEngine
 {
-	using Accessor = typename Endpoint::Core::Accessor;
+	using Accessor = typename IoEngine::Factory::Accessor;
 	using CallId = typename Endpoint::Core::CallId;
 	static constexpr CallId lookupId = 0, invalidId = -1u;
 
@@ -50,8 +50,10 @@ class Endpoint:
 	{
 		bool buildOk;
 
+		typename IoEngine::Factory f;
+
 		auto data = this->Endpoint::Core::template buildCall<ArrayWriter<char>, Call<CallId>>(
-			buildOk, lookupId, ArrayWriter<char>(name, length), Call<CallId>{cb});	
+			f, buildOk, lookupId, ArrayWriter<char>(name, length), Call<CallId>{cb});
 
 		if(buildOk)
 		{
@@ -180,7 +182,10 @@ public:
 	inline const char* call(const Call<NominalArgs...> &call, ActualArgs&&... args)
 	{
 		bool buildOk;
-		auto data = this->Endpoint::Core::template buildCall<NominalArgs...>(buildOk, call.id, rpc::forward<ActualArgs>(args)...);	
+
+		typename IoEngine::Factory f;
+
+		auto data = this->Endpoint::Core::template buildCall<NominalArgs...>(f, buildOk, call.id, rpc::forward<ActualArgs>(args)...);
 		if(buildOk)
 		{
 			if(IoEngine::send(rpc::move(data)))

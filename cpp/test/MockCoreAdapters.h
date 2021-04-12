@@ -2,34 +2,53 @@
 #define _MOCKCOREADAPTERS_H_
 
 #include "MockStream.h"
+#include "1test/Test.h"
 
 #include <map>
 
-struct SelfContainedStreamWriter: MockStream, MockStream::Accessor {
-    SelfContainedStreamWriter(size_t s): MockStream(s), MockStream::Accessor(this->access()) {}
+class MockStreamWriterFactory;
+
+struct SelfContainedStreamWriter: MockStream, MockStream::Accessor
+{
+	MockStreamWriterFactory& f;
+    inline SelfContainedStreamWriter(MockStreamWriterFactory& f, size_t s);
+    inline ~SelfContainedStreamWriter();
 };
 
 struct MockStreamWriterFactory
 {
     using Accessor = MockStream::Accessor;
+    int inUse = 0;
 
     static inline int failAt = 0;
 
-    static inline auto build(size_t s) 
+    inline auto build(size_t s)
     {
         if(failAt > 0)
         {
             if(--failAt == 0)
-                return SelfContainedStreamWriter(0);
+                return SelfContainedStreamWriter(*this, 0);
         }
 
-        return SelfContainedStreamWriter(s); 
+        return SelfContainedStreamWriter(*this, s);
     }
 
-    decltype(auto)static inline done(SelfContainedStreamWriter &&w) { 
+    decltype(auto) inline done(SelfContainedStreamWriter &&w) {
         return static_cast<MockStream&&>(w); 
     }
+
+    inline ~MockStreamWriterFactory() {
+    	CHECK(inUse == 0);
+    }
 };
+
+inline SelfContainedStreamWriter::SelfContainedStreamWriter(MockStreamWriterFactory& f, size_t s): MockStream(s), MockStream::Accessor(this->access()), f(f) {
+	f.inUse++;
+}
+
+SelfContainedStreamWriter::~SelfContainedStreamWriter() {
+	f.inUse--;
+}
 
 template<class K, class V>
 class MockRegistry
