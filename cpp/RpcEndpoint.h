@@ -26,23 +26,24 @@ namespace detail
 }
 
 /**
- * RPC engine frontend.
+ * RPC engine front-end.
  */
 template <
 	template<class> class Pointer,
 	template<class, class> class Registry,
 	class NameRegistry,
-	class IoEngine
+	class IoEngine,
+	class Factory
 >
 class Endpoint:
 	Core<
-		typename IoEngine::Factory::Accessor,
+		typename Factory::Accessor,
 		Pointer, 
 		Registry, 
-		Endpoint<Pointer, Registry, NameRegistry, IoEngine>&>, 
-	NameRegistry, public IoEngine
+		Endpoint<Pointer, Registry, NameRegistry, IoEngine, Factory>&>,
+	NameRegistry
 {
-	using Accessor = typename IoEngine::Factory::Accessor;
+	using Accessor = typename Factory::Accessor;
 	using CallId = typename Endpoint::Core::CallId;
 	static constexpr CallId lookupId = 0, invalidId = -1u;
 
@@ -50,14 +51,14 @@ class Endpoint:
 	{
 		bool buildOk;
 
-		typename IoEngine::Factory f;
+		Factory f;
 
 		auto data = this->Endpoint::Core::template buildCall<ArrayWriter<char>, Call<CallId>>(
 			f, buildOk, lookupId, ArrayWriter<char>(name, length), Call<CallId>{cb});
 
 		if(buildOk)
 		{
-			if(IoEngine::send(rpc::move(data)))
+			if(static_cast<IoEngine*>(this)->send(rpc::move(data)))
 				return nullptr;
 
 			return Errors::couldNotSendLookupMessage;
@@ -67,8 +68,6 @@ class Endpoint:
 	}
 
 public:
-	using IoEngine::IoEngine;
-
 	/**
 	 * Initialize the internal state of the RPC endpoint.
 	 * 
@@ -183,12 +182,12 @@ public:
 	{
 		bool buildOk;
 
-		typename IoEngine::Factory f;
+		Factory f;
 
 		auto data = this->Endpoint::Core::template buildCall<NominalArgs...>(f, buildOk, call.id, rpc::forward<ActualArgs>(args)...);
 		if(buildOk)
 		{
-			if(IoEngine::send(rpc::move(data)))
+			if(static_cast<IoEngine*>(this)->send(rpc::move(data)))
 				return nullptr;
 
 			return Errors::couldNotSendMessage;

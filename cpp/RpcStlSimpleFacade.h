@@ -8,8 +8,8 @@
 
 namespace rpc {
 
-template<class IoEngine> using StlSimpleFacade
-		= Endpoint<detail::StlAutoPointer, detail::HashMapRegistry, detail::HashMapBasedNameDictionary, IoEngine>;
+template<class IoEngine, class Factory> using StlSimpleFacade
+	= Endpoint<detail::StlAutoPointer, detail::HashMapRegistry, detail::HashMapBasedNameDictionary, IoEngine, Factory>;
 
 }
 
