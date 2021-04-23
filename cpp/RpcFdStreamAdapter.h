@@ -11,113 +11,107 @@
 namespace rpc {
 
 class FdStreamAdapter;
+class PreallocatedMemoryBufferStreamWriterFactory;
 
-namespace detail 
-{    
-    class PreallocatedMemoryBufferStreamWriterFactory;
+class PreallocatedMemoryBufferStream
+{
+    std::unique_ptr<char[]> buffer;
+    char *start, *end;
 
-    class PreallocatedMemoryBufferStream
-    {
-        std::unique_ptr<char[]> buffer;
-        char *start, *end;
+    friend FdStreamAdapter;
+    friend PreallocatedMemoryBufferStreamWriterFactory;
 
-        friend FdStreamAdapter;
-        friend PreallocatedMemoryBufferStreamWriterFactory;
-
-        inline PreallocatedMemoryBufferStream(std::unique_ptr<char[]> &&buffer, size_t size): 
-            buffer(std::move(buffer)), start(this->buffer.get()), end(this->buffer.get() + size) {}
-        
+    inline PreallocatedMemoryBufferStream(std::unique_ptr<char[]> &&buffer, size_t size): 
+        buffer(std::move(buffer)), start(this->buffer.get()), end(this->buffer.get() + size) {}
+    
 public:
-        struct Accessor
-        {
-            friend PreallocatedMemoryBufferStream;
-            char *ptr = nullptr, *end = nullptr;
-
-            friend class PreallocatedMemoryBufferStreamWriter;
-
-        public:
-            inline Accessor(char* ptr, char* end): ptr(ptr), end(end) {}
-            inline Accessor() = default;
-            
-            template<class T>
-            bool write(const T& v)
-            {
-                constexpr auto size = sizeof(T);
-                assert(size <= size_t(end - ptr));
-                memcpy(ptr, &v, size);
-                ptr += size;
-                return true;
-            }
-
-            template<class T>
-            bool read(T& v)
-            {
-                constexpr auto size = sizeof(T);
-                assert(size <= size_t(end - ptr));
-                memcpy(&v, ptr, size);
-                ptr += size;
-                return true;
-            }
-
-            bool skip(size_t size)
-            {
-                assert(size <= size_t(end - ptr));
-                ptr += size;
-                return true;
-            }
-        };
-
-        inline auto access() {
-            return Accessor(start, end);
-        }
-
-        inline PreallocatedMemoryBufferStream(PreallocatedMemoryBufferStream&&) = default;
-        inline PreallocatedMemoryBufferStream& operator =(PreallocatedMemoryBufferStream&&) = default;
-        inline PreallocatedMemoryBufferStream(size_t size):
-            buffer(new char[size + VarUint4::size((uint32_t)size)]),
-            start(buffer.get()), end(buffer.get() + size + VarUint4::size((uint32_t)size))
-        {
-            auto a = access();
-            assert(size == (size_t)((uint32_t)size));
-            assert(rpc::VarUint4::write(a, size));
-            start = a.ptr;
-        };
-    };
-
-    struct PreallocatedMemoryBufferStreamWriter: PreallocatedMemoryBufferStream, PreallocatedMemoryBufferStream::Accessor {
-        inline PreallocatedMemoryBufferStreamWriter(size_t s): 
-            PreallocatedMemoryBufferStream(s), 
-            PreallocatedMemoryBufferStream::Accessor(this->access()) {}
-    };
-
-    struct PreallocatedMemoryBufferStreamWriterFactory
+    struct Accessor
     {
-        using Accessor = PreallocatedMemoryBufferStream::Accessor;
+        friend PreallocatedMemoryBufferStream;
+        char *ptr = nullptr, *end = nullptr;
 
-        static inline auto build(size_t s) {
-            return PreallocatedMemoryBufferStreamWriter(s); 
+        friend class PreallocatedMemoryBufferStreamWriter;
+
+    public:
+        inline Accessor(char* ptr, char* end): ptr(ptr), end(end) {}
+        inline Accessor() = default;
+        
+        template<class T>
+        bool write(const T& v)
+        {
+            constexpr auto size = sizeof(T);
+            assert(size <= size_t(end - ptr));
+            memcpy(ptr, &v, size);
+            ptr += size;
+            return true;
         }
 
-        static inline auto done(PreallocatedMemoryBufferStreamWriter &&w) 
+        template<class T>
+        bool read(T& v)
         {
-            auto stream = static_cast<PreallocatedMemoryBufferStream&&>(w);
-            auto accessor = static_cast<PreallocatedMemoryBufferStream::Accessor&&>(w);
-            stream.end = accessor.end;
-            return stream; 
+            constexpr auto size = sizeof(T);
+            assert(size <= size_t(end - ptr));
+            memcpy(&v, ptr, size);
+            ptr += size;
+            return true;
+        }
+
+        bool skip(size_t size)
+        {
+            assert(size <= size_t(end - ptr));
+            ptr += size;
+            return true;
         }
     };
-}
+
+    inline auto access() {
+        return Accessor(start, end);
+    }
+
+    inline PreallocatedMemoryBufferStream(PreallocatedMemoryBufferStream&&) = default;
+    inline PreallocatedMemoryBufferStream& operator =(PreallocatedMemoryBufferStream&&) = default;
+    inline PreallocatedMemoryBufferStream(size_t size):
+        buffer(new char[size + VarUint4::size((uint32_t)size)]),
+        start(buffer.get()), end(buffer.get() + size + VarUint4::size((uint32_t)size))
+    {
+        auto a = access();
+        assert(size == (size_t)((uint32_t)size));
+        assert(rpc::VarUint4::write(a, size));
+        start = a.ptr;
+    };
+};
+
+struct PreallocatedMemoryBufferStreamWriter: PreallocatedMemoryBufferStream, PreallocatedMemoryBufferStream::Accessor {
+    inline PreallocatedMemoryBufferStreamWriter(size_t s): 
+        PreallocatedMemoryBufferStream(s), 
+        PreallocatedMemoryBufferStream::Accessor(this->access()) {}
+};
+
+struct PreallocatedMemoryBufferStreamWriterFactory
+{
+    using Accessor = PreallocatedMemoryBufferStream::Accessor;
+
+    static inline auto build(size_t s) {
+        return PreallocatedMemoryBufferStreamWriter(s); 
+    }
+
+    static inline auto done(PreallocatedMemoryBufferStreamWriter &&w) 
+    {
+        auto stream = static_cast<PreallocatedMemoryBufferStream&&>(w);
+        auto accessor = static_cast<PreallocatedMemoryBufferStream::Accessor&&>(w);
+        stream.end = accessor.end;
+        return stream; 
+    }
+};
 
 class FdStreamAdapter
 {
     int wfd = -1, rfd = -1;
 public:
-    using Factory = detail::PreallocatedMemoryBufferStreamWriterFactory;
-
     FdStreamAdapter(const FdStreamAdapter&) = delete;
     inline FdStreamAdapter(int wfd, int rfd): wfd(wfd), rfd(rfd) {}
 
-    bool send(detail::PreallocatedMemoryBufferStream&& data)
+    bool send(PreallocatedMemoryBufferStream&& data)
     {
         auto ptr = data.buffer.get();
         auto len = data.end - ptr;
@@ -148,7 +142,7 @@ public:
         if(read(rfd, buffer.get(), messageLength) != messageLength)
             return false;
 
-        return cb(detail::PreallocatedMemoryBufferStream(std::move(buffer), messageLength));
+        return cb(PreallocatedMemoryBufferStream(std::move(buffer), messageLength));
     }
 };
 

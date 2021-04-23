@@ -67,7 +67,7 @@ static inline void runEchoTest(std::shared_ptr<Rpc> uut)
 {
     rpc::Call<std::string, rpc::Call<std::string>> echo = uut->lookup(syms::echo).get();
     auto key = generateUniqueKey();
-    auto result = uut->call(echo, key);
+    auto result = uut->asyncCall(echo, key);
     assert(result.get() == key);
 }
 
@@ -84,7 +84,7 @@ static inline void runStreamGeneratorTest(std::shared_ptr<Rpc> uut)
         void runTest(decltype(uut)& uut) 
         {
             int idx = 0;
-            for(auto v: uut->call(std::get<1>(methods), 5).get())
+            for(auto v: uut->asyncCall(std::get<1>(methods), 5).get())
             {
                 idx++;
                 assert(v == state);
@@ -94,12 +94,12 @@ static inline void runStreamGeneratorTest(std::shared_ptr<Rpc> uut)
         }
 
         void close(decltype(uut)& uut) {
-            uut->call(std::get<0>(methods));
+            uut->simpleCall(std::get<0>(methods));
         }
     };
 
-    Tester tc1{3, 31, uut->call(open, 3, 31).get()};
-    Tester tc2{5, 17, uut->call(open, 5, 17).get()};
+    Tester tc1{3, 31, uut->asyncCall(open, 3, 31).get()};
+    Tester tc2{5, 17, uut->asyncCall(open, 5, 17).get()};
 
     for(int i = 0; i<10; i++)
         tc1.runTest(uut);
@@ -181,13 +181,13 @@ std::thread runInteropTests(std::shared_ptr<Rpc> uut)
 
     auto t = startServiceThread(uut);
 
-    uut->call(uut->lookup(syms::unlock).get(), false);
+    uut->simpleCall(uut->lookup(syms::unlock).get(), false);
 
     runUnknownMethodLookupTest(uut);
     runEchoTest(uut);
     runStreamGeneratorTest(uut);
 
-    uut->call(uut->lookup(syms::unlock).get(), true);
+    uut->simpleCall(uut->lookup(syms::unlock).get(), true);
 
     while(locked) std::this_thread::yield();
 

@@ -162,36 +162,24 @@ namespace detail
         }
     };
 
-    template<class...> struct CallEnabler;
-
     template<class... CbArgs> class Call;
 
-    template<class... CbArgs>
-    struct CallEnabler<Call<CbArgs...>>
-    {
-        template<template<class...> class R> using Retriever = R<CbArgs...>;
-        struct Void {};
-    };
+    template<class...> struct CallEnabler;
 
-    template<>
-    struct CallEnabler<>
-    {
-        template<template <class...> class> class Retriever {};
-        struct Void { using Type = void; };
-    };
-
-    template<class C>
-    struct CallEnabler<C>
-    {
-        template<template <class...> class> class Retriever {};
-        struct Void { using Type = void; };
-    };
-
+    /// Recursor, eats all but last arguments.
     template<class First, class... Rest>
-    struct CallEnabler<First, Rest...>
-    {
+    struct CallEnabler<First, Rest...> {
         template<template<class...> class R> using Retriever = typename CallEnabler<Rest...>::template Retriever<R>;
-        using Void = typename CallEnabler<Rest...>::Void;
+    };
+
+    /// Last element handler (for non-Call types)
+    template<class C> struct CallEnabler<C> { template<template <class...> class> class Retriever {}; };
+    template<> struct CallEnabler<> { template<template <class...> class> class Retriever {}; };
+
+    /// Last element handler (for Call types)
+    template<class... CbArgs>
+    struct CallEnabler<rpc::Call<CbArgs...>> {
+        template<template<class...> class R> using Retriever = R<CbArgs...>;
     };
 }
 

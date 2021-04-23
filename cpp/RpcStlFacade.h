@@ -33,17 +33,18 @@ public:
  * the STL implementation. When tighter control ver heap usage is a requirement alternate
  * implementations for the dependencies can be used.
  */
-template<class IoEngine>
+template<class IoEngine, class Factory>
 class StlFacade: Endpoint<
     detail::StlAutoPointer, 
     detail::HashMapRegistry,
     detail::HashMapBasedNameDictionary, 
-    IoEngine
+    IoEngine,
+    Factory
 >{
 	friend IoEngine;
+    friend typename StlFacade::Endpoint;
 
 public:
-	using StlFacade::Endpoint::init;
     using StlFacade::Endpoint::process;
     using StlFacade::Endpoint::install;
     using StlFacade::Endpoint::uninstall;
@@ -66,10 +67,8 @@ public:
      * Wrapper around Endpoint::init.
      */
     template<class... Args>
-    StlFacade(Args&&... args): StlFacade::Endpoint(std::forward<Args>(args)...)
-    {
-        if(!this->init())
-            throw RpcException("failed to initialize");
+    StlFacade(Args&&... args): StlFacade::Endpoint(std::forward<Args>(args)...) {
+        assert(this->Endpoint::init());
     }
 
     /**
@@ -122,23 +121,15 @@ public:
 	}
 
     /**
-     * Wrapper for Endpoint::call, no-callback case.
+     * Wrapper for Endpoint::call, with no special callback handling.
      * 
      * Throws instead of returning error.
      */
     template<class... NominalArgs, class... ActualArgs>
-    inline void
-	simpleCall(const Call<NominalArgs...> &call, ActualArgs&&... args)
+    inline void simpleCall(const Call<NominalArgs...> &call, ActualArgs&&... args)
 	{
         if(auto err = this->StlFacade::Endpoint::call(call, std::forward<ActualArgs>(args)...))
             throw RpcException(err);
-    }
-
-    template<class... NominalArgs, class... ActualArgs>
-    inline typename detail::CallEnabler<NominalArgs...>::Void::Type
-	call(const Call<NominalArgs...> &call, ActualArgs&&... args)
-	{
-        simpleCall(call, rpc::forward<ActualArgs>(args)...);
     }
 
     /**
@@ -168,16 +159,18 @@ public:
      * Wrapper for Endpoint::call, value returned via callback case.
      * 
      * Can only be used when the last argument is a callback handle.
-     * Expects to called with the arguments of thy signature except the last one.
+     * Expects to be called with the arguments of the signature except 
+     * the last one, which is substituted with a managed data forwarder
+     * providing the results via the future object that is returned.
      * 
-     * Returns an std::future object that gets set to the returned value when
-     * the callback is invoked.
+     * Returns a std::future object that gets set to the returned value 
+     * when the callback is invoked.
      * 
      * Throws instead of returning error.
      */
     template<class... NominalArgs, class... ActualArgs>
 	inline typename detail::CallEnabler<NominalArgs...>::template Retriever<ResultRetriever>::Future 
-    call(const Call<NominalArgs...> &call, ActualArgs&&... args)
+    asyncCall(const Call<NominalArgs...> &call, ActualArgs&&... args)
 	{
         typename detail::CallEnabler<NominalArgs...>::template Retriever<ResultRetriever> retriever;       
 

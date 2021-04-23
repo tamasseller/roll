@@ -7,7 +7,10 @@
 #include <memory>
 #include <thread>
 
-using Rpc = rpc::StlFacade<rpc::FdStreamAdapter>;
+struct Rpc: rpc::StlFacade<Rpc, rpc::PreallocatedMemoryBufferStreamWriterFactory>, rpc::FdStreamAdapter
+{
+    using FdStreamAdapter::FdStreamAdapter;
+};
 
 std::thread runInteropTests(std::shared_ptr<Rpc>);
 
