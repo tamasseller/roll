@@ -61,6 +61,8 @@ public:
 	constexpr inline bool operator==(const Call& other) const {
 		return id == other.id;
 	}
+
+	inline auto diagGetId() const { return id; }
 };
 
 /**
