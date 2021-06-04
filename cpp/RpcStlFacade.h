@@ -9,7 +9,6 @@
 
 namespace rpc {
 
-
 /**
  * RPC specific exception object.
  */
@@ -135,9 +134,9 @@ public:
     /**
      * Helper that forwards results obtained via callback into std::future.
      */
-    template<class...> class ResultRetriever {};
+    template<class D, class...> class ResultRetriever {};
 
-    template<class V> class ResultRetriever<V>
+    template<class D, class V> class ResultRetriever<D, V>
     {
         friend StlFacade;
         using Future = std::future<V>;
@@ -151,6 +150,22 @@ public:
         inline auto operator()(StlFacade::Endpoint& ep, const MethodHandle &h, V v) const
         {
             promise.set_value(std::move(v));
+            return ep.uninstall(h);
+        }
+    };
+
+    template<class D> class ResultRetriever<D>
+    {
+        friend StlFacade;
+        using Future = std::future<void>;
+        mutable std::promise<void> promise;
+
+        inline auto getFuture() {
+            return promise.get_future();
+        }
+
+    public:
+        inline auto operator()(StlFacade::Endpoint& ep, const MethodHandle &h) const {
             return ep.uninstall(h);
         }
     };

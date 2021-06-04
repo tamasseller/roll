@@ -179,7 +179,7 @@ namespace detail
     /// Last element handler (for Call types)
     template<class... CbArgs>
     struct CallEnabler<rpc::Call<CbArgs...>> {
-        template<template<class...> class R> using Retriever = R<CbArgs...>;
+        template<template<class...> class R> using Retriever = R<void, CbArgs...>;
     };
 }
 

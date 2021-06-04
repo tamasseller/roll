@@ -71,8 +71,8 @@ public:
     inline PreallocatedMemoryBufferStream(PreallocatedMemoryBufferStream&&) = default;
     inline PreallocatedMemoryBufferStream& operator =(PreallocatedMemoryBufferStream&&) = default;
     inline PreallocatedMemoryBufferStream(size_t size):
-        buffer(new char[size + VarUint4::size((uint32_t)size)]),
-        start(buffer.get()), end(buffer.get() + size + VarUint4::size((uint32_t)size))
+        buffer(new char[size]),
+        start(buffer.get()), end(buffer.get() + size)
     {
         auto a = access();
         assert(size == (size_t)((uint32_t)size));
@@ -83,7 +83,7 @@ public:
 
 struct PreallocatedMemoryBufferStreamWriter: PreallocatedMemoryBufferStream, PreallocatedMemoryBufferStream::Accessor {
     inline PreallocatedMemoryBufferStreamWriter(size_t s): 
-        PreallocatedMemoryBufferStream(s), 
+        PreallocatedMemoryBufferStream(s + VarUint4::size((uint32_t)s)),
         PreallocatedMemoryBufferStream::Accessor(this->access()) {}
 };
 
@@ -132,7 +132,8 @@ public:
 
             if(r.process(c))
             {
-                messageLength = r.getResult();
+                auto result = r.getResult();
+                messageLength = result - VarUint4::size((uint32_t)result);
                 break;
             }
         }
