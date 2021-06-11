@@ -45,7 +45,6 @@ class Endpoint:
 {
 	using Accessor = typename Factory::Accessor;
 	using CallId = typename Endpoint::Core::CallId;
-	static constexpr CallId lookupId = 0, invalidId = -1u;
 
 	const char* doLookup(const char* name, size_t length, CallId cb)
 	{
@@ -68,6 +67,8 @@ class Endpoint:
 	}
 
 public:
+	static constexpr CallId lookupId = 0, invalidId = -1u;
+
 	/**
 	 * Initialize the internal state of the RPC endpoint.
 	 * 
@@ -209,7 +210,7 @@ public:
 	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
 	 */
 	template<size_t n, class... Args, class C>
-	inline const char* provide(Symbol<n, Args...> sym, C&& c) 
+	inline const char* provide(const Symbol<n, Args...> &sym, C&& c)
 	{
 		auto &core = *((typename Endpoint::Core*)this);
 		auto id = core.template add<detail::Plain<Args>...>(rpc::forward<C>(c));
@@ -234,7 +235,7 @@ public:
 	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
 	 */
 	template<size_t n, class... Args>
-	inline const char* discard(Symbol<n, Args...> sym) 
+	inline const char* discard(const Symbol<n, Args...> &sym)
 	{
 		CallId id;
 		
@@ -271,9 +272,9 @@ public:
 	inline const char* lookup(const Symbol<n, Args...> &sym, C&& c) 
 	{
 		auto &core = *((typename Endpoint::Core*)this);
-		auto id = core.template add<CallId>([this, c{rpc::forward<C>(c)}](Endpoint &uut, const rpc::MethodHandle &handle, CallId result) mutable
+		auto id = core.template add<CallId>([this, c{rpc::forward<C>(c)}](Endpoint &ep, const rpc::MethodHandle &handle, CallId result) mutable
 		{
-			c(uut, result != invalidId, Call<Args...>{result});
+			c(ep, result != invalidId, Call<Args...>{result});
 
 			auto &core = *((typename Endpoint::Core*)this);
 			if(!core.removeCall(handle.id))
