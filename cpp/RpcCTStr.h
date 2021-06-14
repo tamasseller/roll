@@ -61,8 +61,12 @@ static inline constexpr CTStr<n1 + n2 - 1> operator<<(const CTStr<n1>& s1, const
 	return CTStr<n1 + n2 - 1>(s1, a2);
 }
 
-template<size_t np1> CTStr(const char (&)[np1]) -> CTStr<np1 - 1>;
+}
 
+template <class T, T... cs>
+static constexpr inline auto operator "" _ctstr() {
+	constexpr char a[] = {cs..., '\0'};
+	return rpc::CTStr<sizeof...(cs)>(a);
 }
 
 #endif /* _RPCCTSTR_H_ */

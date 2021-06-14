@@ -435,7 +435,7 @@ TEST(SerDes, ArrayWriter)
 TEST(SerDes, CTStr)
 {
     static constexpr const char str[] = "indistinguishable";
-    static constexpr auto ctstr = rpc::CTStr(str);
+    static constexpr auto ctstr = rpc::CTStr<sizeof(str)-1>(str);
     auto data = write(rpc::ArrayWriter<char>((const char*)ctstr, ctstr.strLength));
     CHECK(read(data, std::string(str)));
 }

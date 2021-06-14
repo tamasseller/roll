@@ -190,17 +190,31 @@ template<class... Args> struct TypeInfo<Call<Args...>>
 };
 
 /**
+ * Placeholder for contract definitions.
+ *
+ * NOTE: It can not be used to access (read/write) data.
+ */
+template<class T> struct CollectionPlaceholder {
+	template<class S> static constexpr inline decltype(auto) writeName(S&& s) {
+		return TypeInfo<T>::writeName(s << "[") << "]";
+	}
+};
+
+template<class T> struct TypeInfo<CollectionPlaceholder<T>>
+{
+	template<class S> static constexpr inline decltype(auto) writeName(S&& s) {
+		return CollectionPlaceholder<T>::writeName(rpc::move(s));
+	}
+};
+
+/**
  * Common serialization rules for all collection objects.
  * 
  * A collection's length is written first using variable length encoding 
  * then the elements of the collection are written one after the other.
  */
-template<class T> struct CollectionTypeBase
+template<class T> struct CollectionTypeBase: CollectionPlaceholder<T>
 { 
-	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { 
-		return TypeInfo<T>::writeName(s << "[") << "]";
-	}
-
 	template<class S> static inline bool skip(S& s)
     {
         uint32_t count;

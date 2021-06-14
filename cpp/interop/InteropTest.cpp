@@ -11,13 +11,13 @@
 
 namespace syms
 {
-    static constexpr auto echo = rpc::symbol<std::string, rpc::Call<std::string>>(rpc::CTStr("echo"));
-    static constexpr auto nope = rpc::symbol<>(rpc::CTStr("nope"));
-    static constexpr auto unlock = rpc::symbol<bool>(rpc::CTStr("unlock"));
+    static constexpr auto echo = rpc::symbol<std::string, rpc::Call<std::string>>("echo"_ctstr);
+    static constexpr auto nope = rpc::symbol<>("nope"_ctstr);
+    static constexpr auto unlock = rpc::symbol<bool>("unlock"_ctstr);
     using Close = rpc::Call<>;
     using Read = rpc::Call<uint32_t, rpc::Call<std::list<uint16_t>>>;
     using Methods = std::tuple<Close, Read>;
-    static constexpr auto open = rpc::symbol<uint8_t, uint8_t, rpc::Call<Methods>>(rpc::CTStr("open"));
+    static constexpr auto open = rpc::symbol<uint8_t, uint8_t, rpc::Call<Methods>>("open"_ctstr);
 }
 
 static inline auto generateUniqueKey()

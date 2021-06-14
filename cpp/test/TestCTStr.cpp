@@ -32,21 +32,21 @@ TEST_GROUP(String)
 
 TEST(String, Sanity)
 {
-    auto asdqwe = rpc::CTStr("asd") << "qwe";
+    auto asdqwe = "asd"_ctstr << "qwe";
     CHECK(std::string("asdqwe") == (const char*)asdqwe);
 }
 
 TEST(String, Constexpr)
 {
-    constexpr auto asdqwe = rpc::CTStr("asd") << "qwe";
+    constexpr auto asdqwe = "asd"_ctstr << "qwe";
     CHECK(std::string("asdqwe") == (const char*)asdqwe);
 }
 
 TEST(String, Delegated)
 {
-    auto result1 = append<Worker1>(rpc::CTStr("prefix-"));
-    auto result2 = append<Worker2>(rpc::CTStr("prefix-"));
-    auto result3 = append<NonWorker>(rpc::CTStr("prefix-"));
+    auto result1 = append<Worker1>("prefix-"_ctstr);
+    auto result2 = append<Worker2>("prefix-"_ctstr);
+    auto result3 = append<NonWorker>("prefix-"_ctstr);
 
     char temp[128];
 

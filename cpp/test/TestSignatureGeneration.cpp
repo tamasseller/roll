@@ -15,9 +15,9 @@ TEST_GROUP(SignatureGenerator)
     template<class... T>
     std::string sgn() 
     {
-        static constexpr auto ret = rpc::writeSignature<T...>(rpc::CTStr(""));
+        static constexpr auto ret = rpc::writeSignature<T...>(""_ctstr);
 
-        auto alt = rpc::writeSignature<T...>(rpc::CTStr("alt"));
+        auto alt = rpc::writeSignature<T...>("alt"_ctstr);
         CHECK((const char*)ret != (const char*)alt);
         CHECK(std::string((const char*)alt) == std::string("alt") + std::string((const char*)ret));
 
@@ -161,3 +161,8 @@ TEST(SignatureGenerator, StringToIntMultimapOfIntToStringMap) {
 TEST(SignatureGenerator, CharToIntMapOfCharSet) {
     CHECK(sgn<std::set<char>, rpc::Call<std::map<char,int>>>() == "([i1],([{i1,i4}]))");
 }
+
+TEST(SignatureGenerator, StringListPlaceholder) {
+    CHECK(sgn<rpc::CollectionPlaceholder<rpc::CollectionPlaceholder<char>>>() == "([[i1]])");
+}
+

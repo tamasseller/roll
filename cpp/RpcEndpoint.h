@@ -175,7 +175,7 @@ public:
 	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
 	 * The possible errors include:
 	 * 
-	 *  - Processign error during the serialization of the method identifier or arguments,
+	 *  - Processing error during the serialization of the method identifier or arguments,
 	 *  - IO error during sending the request.
 	 */
 	template<class... NominalArgs, class... ActualArgs>

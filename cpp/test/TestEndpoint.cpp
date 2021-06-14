@@ -145,7 +145,7 @@ TEST(Endpoint, ProvideRequire)
     Uut uut;
     CHECK(uut.init());
 
-    constexpr auto sym = rpc::symbol<uint32_t, rpc::Call<std::string>>(rpc::CTStr("symbol"));
+    constexpr auto sym = rpc::symbol<uint32_t, rpc::Call<std::string>>("symbol"_ctstr);
 
     CHECK(nullptr == uut.provide(sym, [](Uut::Endpoint& uut, const rpc::MethodHandle &id, auto x, auto callback) {}));
 
@@ -170,7 +170,7 @@ TEST(Endpoint, ProvideDiscardRequire)
     Uut uut;
     CHECK(uut.init());
 
-    constexpr auto sym = rpc::symbol<uint32_t, rpc::Call<std::string>>(rpc::CTStr("symbol"));
+    constexpr auto sym = rpc::symbol<uint32_t, rpc::Call<std::string>>("symbol"_ctstr);
     CHECK(uut.discard(sym) == rpc::Errors::noSuchSymbol);
 
     CHECK(nullptr == uut.provide(sym, [](Uut::Endpoint& uut, const rpc::MethodHandle &id, auto x, auto callback) {}));
@@ -196,7 +196,7 @@ TEST(Endpoint, ProvideRequireRemovedFromCall)
     Uut uut;
     CHECK(uut.init());
 
-    constexpr auto sym = rpc::symbol<>(rpc::CTStr("symbol"));
+    constexpr auto sym = rpc::symbol<>("symbol"_ctstr);
     CHECK(nullptr == uut.provide(sym, [](Uut::Endpoint& uut, const rpc::MethodHandle &id) {
         uut.uninstall(id);
     }));
@@ -235,7 +235,7 @@ TEST(Endpoint, DoubleProvide)
     Uut uut;
     CHECK(uut.init());
 
-    constexpr auto sym = rpc::symbol<long>(rpc::CTStr("you-only-provide-once"));
+    constexpr auto sym = rpc::symbol<long>("you-only-provide-once"_ctstr);
     CHECK(nullptr == uut.provide(sym, [](auto &uut, auto id, auto x){}));
     CHECK(rpc::Errors::symbolAlreadyExported == uut.provide(sym, [](auto &uut, auto id, auto x){}));
 }
@@ -252,7 +252,7 @@ TEST(Endpoint, ExecuteRemoteWithCallback)
     Uut uut;
     CHECK(uut.init());
 
-    constexpr auto sym = rpc::symbol<uint32_t, rpc::Call<std::string>>(rpc::CTStr("say-hello"));
+    constexpr auto sym = rpc::symbol<uint32_t, rpc::Call<std::string>>("say-hello"_ctstr);
 
     CHECK(nullptr == uut.provide(sym, [](auto &uut, auto id, auto x, auto callback)
     {
@@ -291,7 +291,7 @@ TEST(Endpoint, LookupTotallyUnknownMethod)
     Uut uut;
     CHECK(uut.init());
 
-    constexpr auto sym = rpc::symbol<uint32_t>(rpc::CTStr("non-existent"));
+    constexpr auto sym = rpc::symbol<uint32_t>("non-existent"_ctstr);
 
     bool done = false;
     CHECK(nullptr == uut.lookup(sym, [&done](auto &uut, bool lookupSucceded, auto)
@@ -311,11 +311,11 @@ TEST(Endpoint, LookupMethodWithMistmatchedSignatureUnknownMethod)
     Uut uut;
     CHECK(uut.init());
 
-    constexpr auto defsym = rpc::symbol<std::string>(rpc::CTStr("almost"));
+    constexpr auto defsym = rpc::symbol<std::string>("almost"_ctstr);
 
     CHECK(nullptr == uut.provide(defsym, [](auto &uut, auto id, auto x){}));
 
-    constexpr auto lookupsym = rpc::symbol<int>(rpc::CTStr("almost"));
+    constexpr auto lookupsym = rpc::symbol<int>("almost"_ctstr);
 
     bool done = false;
     CHECK(nullptr == uut.lookup(lookupsym, [&done](auto &uut, bool lookupSucceded, auto)
@@ -336,7 +336,7 @@ TEST(Endpoint, FailToSendLookup)
     CHECK(uut.init());
     bool done = false;
 
-    constexpr auto sym = rpc::symbol<>(rpc::CTStr("dont-care"));
+    constexpr auto sym = rpc::symbol<>("dont-care"_ctstr);
 
     uut.failAt = 1;
 
@@ -352,7 +352,7 @@ TEST(Endpoint, FailToSendLookupResponse)
     CHECK(uut.init());
     bool done = false;
 
-    constexpr auto sym = rpc::symbol<>(rpc::CTStr("dont-care"));
+    constexpr auto sym = rpc::symbol<>("dont-care"_ctstr);
 
     uut.failAt = 2;
 
@@ -369,7 +369,7 @@ TEST(Endpoint, FailToCreateLookup)
     CHECK(uut.init());
     bool done = false;
 
-    constexpr auto sym = rpc::symbol<>(rpc::CTStr("dont-care"));
+    constexpr auto sym = rpc::symbol<>("dont-care"_ctstr);
 
     MockStreamWriterFactory::failAt = 1;
 
@@ -385,7 +385,7 @@ TEST(Endpoint, FailToCreateLookupResponse)
     CHECK(uut.init());
     bool done = false;
 
-    constexpr auto sym = rpc::symbol<>(rpc::CTStr("dont-care"));
+    constexpr auto sym = rpc::symbol<>("dont-care"_ctstr);
 
     MockStreamWriterFactory::failAt = 2;
 
