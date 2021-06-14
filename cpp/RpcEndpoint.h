@@ -14,15 +14,17 @@ namespace rpc {
 namespace detail 
 {
 	template<class> struct CallOperatorSignatureUtility;
-	template<class T> using Plain = remove_const_t<remove_reference_t<T>>;
 
 	template<class Ret, class Type, class Ctx1, class Ctx2, class... Args> struct CallOperatorSignatureUtility<Ret (Type::*)(Ctx1, Ctx2, Args...) const>
 	{
 		template<class Core, class C>
 		static inline decltype(auto) install(Core &core, C&& c) {
-			return Call<Plain<Args>...>{core.template add<Plain<Args>...>(rpc::forward<C>(c))};
+			return Call<base_type<Args>...>{core.template add<base_type<Args>...>(rpc::forward<C>(c))};
 		}
 	};
+
+	template<class Ret, class Type, class Ctx1, class Ctx2, class... Args> struct CallOperatorSignatureUtility<Ret (Type::*)(Ctx1, Ctx2, Args...)>:
+		CallOperatorSignatureUtility<Ret (Type::*)(Ctx1, Ctx2, Args...) const> {};
 }
 
 /**
@@ -212,14 +214,14 @@ public:
 	template<size_t n, class... Args, class C>
 	inline const char* provide(const Symbol<n, Args...> &sym, C&& c)
 	{
-		auto &core = *((typename Endpoint::Core*)this);
-		auto id = core.template add<detail::Plain<Args>...>(rpc::forward<C>(c));
+		Call<Args...> id = this->install(rpc::forward<C>(c));
 		
 		auto &nameReg = *((NameRegistry*)this);
-		if(nameReg.addMapping((const char*)sym, id))
+		if(nameReg.addMapping((const char*)sym, id.id))
 			return nullptr;
 		
-		if(!core.removeCall(id))
+		auto &core = *((typename Endpoint::Core*)this);
+		if(!core.removeCall(id.id))
 			return Errors::internalError; // GCOV_EXCL_LINE
 		
 		return Errors::symbolAlreadyExported;
@@ -276,8 +278,7 @@ public:
 		{
 			c(ep, result != invalidId, Call<Args...>{result});
 
-			auto &core = *((typename Endpoint::Core*)this);
-			if(!core.removeCall(handle.id))
+			if(!ep.removeCall(handle.id))
 				return Errors::internalError; // GCOV_EXCL_LINE
 
 			return (const char*) nullptr;

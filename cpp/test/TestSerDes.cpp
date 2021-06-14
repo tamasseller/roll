@@ -23,9 +23,9 @@ TEST_GROUP(SerDes), rpc::CallIdTestAccessor
     template<class... C>
     auto write(C&&... c)
     {
-        MockStream stream(rpc::determineSize<rpc::remove_const_t<rpc::remove_reference_t<C>>...>(std::forward<C>(c)...));
+        MockStream stream(rpc::determineSize(std::forward<C>(c)...));
         auto a = stream.access();
-        CHECK(rpc::serialize<rpc::remove_const_t<rpc::remove_reference_t<C>>...>(a, std::forward<C>(c)...));
+        CHECK(rpc::serialize(a, std::forward<C>(c)...));
         CHECK(!a.write('\0'));
         return std::move(stream);
     }
@@ -216,13 +216,13 @@ TEST(SerDes, Truncate)
 TEST(SerDes, NoSpace)
 {
     auto data = std::string("panzerkampfwagen");
-    auto s = rpc::determineSize<std::string>(data);
+    auto s = rpc::determineSize(data);
 
     for(auto i = 0u; i <= s; i++)
     {
         MockStream stream(i);
         auto a = stream.access();
-        bool sok = rpc::serialize<std::string>(a, data);
+        bool sok = rpc::serialize(a, data);
 
         if(i < s)
             CHECK(!sok);
@@ -399,12 +399,12 @@ TEST(SerDes, ArrayWriter)
     unsigned short exp[] = {0xb16b, 0x00b5};
     rpc::ArrayWriter<unsigned short> input(exp);
 
-    auto size = rpc::determineSize<decltype(input)>(input);
+    auto size = rpc::determineSize(input);
     for(auto i = 0u; i < size; i++)
     {
         MockStream stream(i);
         auto a = stream.access();
-        CHECK(!rpc::serialize<decltype(input)>(a, input));
+        CHECK(!rpc::serialize(a, input));
     }
 
     for(int i = 0; ; i++)
@@ -493,12 +493,12 @@ TEST(SerDes, CollectionGenerator)
     	return exp[i++];
     });
 
-    auto size = rpc::determineSize<decltype(input)>(input);
+    auto size = rpc::determineSize(input);
     for(auto i = 0u; i < size; i++)
     {
         MockStream stream(i);
         auto a = stream.access();
-        CHECK(!rpc::serialize<decltype(input)>(a, input));
+        CHECK(!rpc::serialize(a, input));
     }
 
     bool done = false;

@@ -47,13 +47,13 @@ public:
 
     template<class... OArgs>
 	constexpr inline Call(const Call<OArgs...>& o): id(o.id) {
-		static_assert(writeSignature<Args...>(CTStr("")) == writeSignature<OArgs...>(CTStr("")));
+		static_assert(writeSignature<Args...>(""_ctstr) == writeSignature<OArgs...>(""_ctstr));
 	}
 
 	template<class... OArgs>
 	constexpr inline Call& operator =(const Call<OArgs...>& o) 
 	{
-        static_assert(writeSignature<Args...>(CTStr("")) == writeSignature<OArgs...>(CTStr("")));
+        static_assert(writeSignature<Args...>(""_ctstr) == writeSignature<OArgs...>(""_ctstr));
 		id = o.id;
         return *this;
 	}

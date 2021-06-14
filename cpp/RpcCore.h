@@ -170,9 +170,12 @@ public:
 		using C = Call<NominalArgs...>;
 		C c{id};
 
-		auto size = determineSize<C, NominalArgs...>(c, args...);
+		static_assert(writeSignature<NominalArgs...>(""_ctstr) == writeSignature<ActualArgs...>(""_ctstr));
+
+		auto size = determineSize(c, args...);
 		auto pdu = factory.build(size);
-		ok = serialize<C, NominalArgs...>(pdu, c, rpc::forward<ActualArgs>(args)...);
+
+		ok = serialize(pdu, c, rpc::forward<ActualArgs>(args)...);
 		return factory.done(rpc::move(pdu));
 	}
 };

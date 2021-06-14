@@ -34,6 +34,8 @@ template<class T> struct remove_const<const T> { using type = T;  };
  */
 template<class T> using remove_const_t = typename remove_const<T>::type;
 
+template<class T> using base_type = remove_const_t<remove_reference_t<T>>;
+
 /**
  * Same as std::forward, re-implemented for dependency purposes.
  */
@@ -60,6 +62,12 @@ constexpr remove_reference_t<T>&& move(T&& t) {
     return static_cast<remove_reference_t<T>&&>(t);
 }
 
+}
+
+template <class T, T... cs>
+static inline auto operator "" _nt() -> const T (&)[sizeof...(cs)] {
+	static constexpr const T str[] = {cs...};
+	return str;
 }
 
 #endif /* _RPCUTILITY_H_ */

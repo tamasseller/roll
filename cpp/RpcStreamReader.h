@@ -121,6 +121,13 @@ public:
         inline auto& operator++() { return *this; }
 
         /**
+         * STL (and range based for expression) iterator step operator.
+         *
+         * Does nothing because the value access already moves the forward.
+         */
+        inline auto& operator++(int) { return *this; }
+
+        /**
          * STL (and range based for expression) inequality against dummy end marker operator.
          * 
          * Returns true of there are elments still to be read.
@@ -133,7 +140,7 @@ public:
      * 
      * Needed for compatibility with range based for loop expressions.
      */
-    auto begin() { return Cursor(accessor, length); }
+    auto begin() const { return Cursor(accessor, length); }
 };
 
 /**

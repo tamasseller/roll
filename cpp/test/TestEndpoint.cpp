@@ -4,6 +4,7 @@
 #include "RpcStlMap.h"
 #include "RpcStlTuple.h"
 #include "RpcSymbol.h"
+#include "RpcPlainArray.h"
 
 #include "MockCoreAdapters.h"
 #include "TestCallIdAccessor.h"
@@ -126,7 +127,7 @@ TEST(Endpoint, Hello)
         n++;
     });
 
-    CHECK(nullptr == uut.call(cb, "hello"));
+    CHECK(nullptr == uut.call(cb, "hello"_nt));
     executeLoopback(uut);
     CHECK(n == 1);
 }
@@ -147,7 +148,7 @@ TEST(Endpoint, ProvideRequire)
 
     constexpr auto sym = rpc::symbol<uint32_t, rpc::Call<std::string>>("symbol"_ctstr);
 
-    CHECK(nullptr == uut.provide(sym, [](Uut::Endpoint& uut, const rpc::MethodHandle &id, auto x, auto callback) {}));
+    CHECK(nullptr == uut.provide(sym, [](Uut::Endpoint& uut, const rpc::MethodHandle &id, uint32_t x, rpc::Call<std::string> callback) {}));
 
     bool done = false;
     CHECK(nullptr == uut.lookup(sym, [&done](Uut::Endpoint& uut, bool lookupSucced, auto sayHello)
@@ -173,7 +174,7 @@ TEST(Endpoint, ProvideDiscardRequire)
     constexpr auto sym = rpc::symbol<uint32_t, rpc::Call<std::string>>("symbol"_ctstr);
     CHECK(uut.discard(sym) == rpc::Errors::noSuchSymbol);
 
-    CHECK(nullptr == uut.provide(sym, [](Uut::Endpoint& uut, const rpc::MethodHandle &id, auto x, auto callback) {}));
+    CHECK(nullptr == uut.provide(sym, [](Uut::Endpoint& uut, const rpc::MethodHandle &id, uint32_t x, rpc::Call<std::string> callback) {}));
     CHECK(nullptr == uut.discard(sym));
 
     bool done = false;
@@ -236,8 +237,8 @@ TEST(Endpoint, DoubleProvide)
     CHECK(uut.init());
 
     constexpr auto sym = rpc::symbol<long>("you-only-provide-once"_ctstr);
-    CHECK(nullptr == uut.provide(sym, [](auto &uut, auto id, auto x){}));
-    CHECK(rpc::Errors::symbolAlreadyExported == uut.provide(sym, [](auto &uut, auto id, auto x){}));
+    CHECK(nullptr == uut.provide(sym, [](Uut::Endpoint& uut, rpc::MethodHandle id, long x){}));
+    CHECK(rpc::Errors::symbolAlreadyExported == uut.provide(sym, [](Uut::Endpoint& uut, rpc::MethodHandle id, long x){}));
 }
 
 TEST(Endpoint, DoubleInit)
@@ -254,10 +255,10 @@ TEST(Endpoint, ExecuteRemoteWithCallback)
 
     constexpr auto sym = rpc::symbol<uint32_t, rpc::Call<std::string>>("say-hello"_ctstr);
 
-    CHECK(nullptr == uut.provide(sym, [](auto &uut, auto id, auto x, auto callback)
-    {
+    CHECK(nullptr == uut.provide(sym, [](Uut::Endpoint& uut, const rpc::MethodHandle &id, uint32_t x, rpc::Call<std::string> callback)
+	{
         for(auto i = 0u; i < x; i++)
-            CHECK(nullptr == uut.call(callback, "hello"));
+            CHECK(nullptr == uut.call(callback, "hello"_nt));
     }));
 
     bool done = false;
@@ -266,12 +267,13 @@ TEST(Endpoint, ExecuteRemoteWithCallback)
         CHECK(lookupSucceded);
 
         int n = 0;
-        rpc::Call<std::string> cb = uut.install([&n](Uut::Endpoint &uut, const rpc::MethodHandle &id, const std::string &str) {
+        rpc::Call<std::string> cb = uut.install([&n](Uut::Endpoint &uut, const rpc::MethodHandle &id, const std::string &str)
+		{
             CHECK(str == "hello");
             n++;
         });
     
-        CHECK(nullptr == uut.call(sayHello, 3, cb));
+        CHECK(nullptr == uut.call(sayHello, 3u, cb));
 
         for(int i = 0; i < 4; i++)
             executeLoopback(uut);
@@ -313,7 +315,7 @@ TEST(Endpoint, LookupMethodWithMistmatchedSignatureUnknownMethod)
 
     constexpr auto defsym = rpc::symbol<std::string>("almost"_ctstr);
 
-    CHECK(nullptr == uut.provide(defsym, [](auto &uut, auto id, auto x){}));
+    CHECK(nullptr == uut.provide(defsym, [](Uut::Endpoint& uut, const rpc::MethodHandle &id, std::string callback){}));
 
     constexpr auto lookupsym = rpc::symbol<int>("almost"_ctstr);
 
