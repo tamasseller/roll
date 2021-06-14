@@ -75,4 +75,5 @@ template<class T> struct TypeInfo<ArrayWriter<T>>: StlCompatibleCollectionTypeBa
 };
 
 }
+
 #endif /* _RPCARRAYWRITER_H_ */

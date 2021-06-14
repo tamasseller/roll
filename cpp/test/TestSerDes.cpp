@@ -6,6 +6,7 @@
 #include "RpcStlArray.h"
 #include "RpcStreamReader.h"
 #include "RpcArrayWriter.h"
+#include "RpcCollectionGenerator.h"
 #include "RpcCTStr.h"
 
 #include "MockStream.h"
@@ -481,4 +482,38 @@ TEST(SerDes, ExtraArgs)
     }, std::string("extra")));
 
     CHECK(done);
+}
+
+TEST(SerDes, CollectionGenerator)
+{
+    unsigned short exp[] = {0xb16b, 0x00b5};
+    auto input = rpc::generateCollection(2, [&exp, i(0u)]() mutable
+	{
+    	CHECK(i < sizeof(exp)/sizeof(exp[0]));
+    	return exp[i++];
+    });
+
+    auto size = rpc::determineSize<decltype(input)>(input);
+    for(auto i = 0u; i < size; i++)
+    {
+        MockStream stream(i);
+        auto a = stream.access();
+        CHECK(!rpc::serialize<decltype(input)>(a, input));
+    }
+
+    bool done = false;
+	auto data = write(123, input, 456);
+	auto b = data.access();
+	auto res = rpc::deserialize<int, std::vector<unsigned short>, int>(b,
+        [exp, &done](int a, const auto& data, int b)
+        {
+			CHECK(a == 123);
+            CHECK(data == std::vector<unsigned short>(exp, exp + sizeof(exp)/sizeof(exp[0])));
+            CHECK(b == 456);
+            done = true;
+        }
+	);
+
+	CHECK(res == nullptr);
+	CHECK(done);
 }
