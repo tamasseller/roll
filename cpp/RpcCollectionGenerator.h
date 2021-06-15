@@ -38,13 +38,11 @@ class CollectionGenerator
          */
         inline T operator*()
         {
-			if(remaining)
-			{
-				--remaining;
-				return generator();
-			}
+			if(!remaining)
+				return *(T*)nullptr;
 
-			return {};
+			--remaining;
+			return generator();
         }
 
         /**
