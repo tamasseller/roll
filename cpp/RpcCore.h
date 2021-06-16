@@ -170,7 +170,7 @@ public:
 		using C = Call<NominalArgs...>;
 		C c{id};
 
-		static_assert(writeSignature<NominalArgs...>(""_ctstr) == writeSignature<ActualArgs...>(""_ctstr));
+		static_assert(writeSignature<NominalArgs...>(""_ctstr) == writeSignature<ActualArgs...>(""_ctstr), "RPC invocation signature mismatched");
 
 		auto size = determineSize(c, args...);
 		auto pdu = factory.build(size);
