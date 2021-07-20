@@ -52,6 +52,7 @@ struct VarUint4
 	template<class S> static inline bool read(S& s, uint32_t &v)
 	{
 		uint8_t nBytes = 0;
+		v = 0;
 
 		while(true)
 		{

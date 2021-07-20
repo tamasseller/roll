@@ -25,152 +25,98 @@ template<> struct TypeInfo<bool> {
 };
 
 /**
+ * General serialization rules for primitive integer values.
+ */
+template<class T, char prefix> struct PrimitveIntegerTypeInfoBase
+{
+	static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8);
+	static_assert(prefix == 'i' || prefix == 'u');
+	static constexpr const char sgn[] = {prefix, '0' + (char)sizeof(T), '\0'};
+
+	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { return s << sgn; }
+	template<class S> static inline bool write(S& s, const T &v) { return s.write(v); }
+	template<class S> static inline bool read(S& s, T &v) { return s.read(v); }
+	template<class S> static inline bool skip(S& s) { return s.skip(sizeof(T)); }
+	static constexpr inline size_t size(...) { return sizeof(T); }
+	static constexpr inline bool isConstSize() { return true; }
+};
+
+/**
  * Serialization rules for char values.
  * 
  * A char value is encoded as a single byte.
  */
-template<> struct TypeInfo<char> { 
-	static_assert(sizeof(char) == 1);
-	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { return s << "i1"; }
-	template<class S> static inline bool write(S& s, const char &v) { return s.write(v); }
-	template<class S> static inline bool read(S& s, char &v) { return s.read(v); }
-	template<class S> static inline bool skip(S& s) { return s.skip(1); }
-	static constexpr inline size_t size(...) { return 1; }
-	static constexpr inline bool isConstSize() { return true; }
-};
+template<> struct TypeInfo<char>: PrimitveIntegerTypeInfoBase<char, 'i'> {};
 
 /**
  * Serialization rules for signed char values.
  * 
  * A signed char value is encoded the same way as a char value (are they actually the same?)
  */
-template<> struct TypeInfo<signed char>: TypeInfo<char> {};
+template<> struct TypeInfo<signed char>: PrimitveIntegerTypeInfoBase<signed char, 'i'> {};
 
 /**
  * Serialization rules for unsigned char values.
  * 
  * A unsigned char value is encoded as a single byte.
  */
-template<> struct TypeInfo<unsigned char> 
-{ 
-	static_assert(sizeof(unsigned char) == 1);
-	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { return s << "u1"; }
-	template<class S> static inline bool write(S& s, const unsigned char &v) { return s.write(v); }
-	template<class S> static inline bool read(S& s, unsigned char &v) { return s.read(v); }
-	template<class S> static inline bool skip(S& s) { return s.skip(1); }
-	static constexpr inline size_t size(...) { return 1; }
-	static constexpr inline bool isConstSize() { return true; }
-};
+template<> struct TypeInfo<unsigned char>: PrimitveIntegerTypeInfoBase<unsigned char, 'u'> {};
 
 /**
  * Serialization rules for signed short values.
  * 
  * A signed short value is encoded as two bytes in little endian (LSB first) order.
  */
-template<> struct TypeInfo<signed short> 
-{
-	static_assert(sizeof(signed short) == 2);
-	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { return s << "i2"; }
-	template<class S> static inline bool write(S& s, const signed short &v) { return s.write(v); }
-	template<class S> static inline bool read(S& s, signed short &v) { return s.read(v); }
-	template<class S> static inline bool skip(S& s) { return s.skip(2); }
-	static constexpr inline size_t size(...) { return 2; }
-	static constexpr inline bool isConstSize() { return true; }
-};
+template<> struct TypeInfo<signed short>: PrimitveIntegerTypeInfoBase<signed short, 'i'> {};
 
 /**
  * Serialization rules for unsigned short values.
  * 
  * A unsigned short value is encoded as two bytes in little endian (LSB first) order.
  */
-template<> struct TypeInfo<unsigned short> 
-{
-	static_assert(sizeof(unsigned short) == 2);
-	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { return s << "u2"; }
-	template<class S> static inline bool write(S& s, const unsigned short &v) { return s.write(v); }
-	template<class S> static inline bool read(S& s, unsigned short &v) { return s.read(v); }
-	template<class S> static inline bool skip(S& s) { return s.skip(2); }
-	static constexpr inline size_t size(...) { return 2; }
-	static constexpr inline bool isConstSize() { return true; }
-};
+template<> struct TypeInfo<unsigned short>: PrimitveIntegerTypeInfoBase<unsigned short, 'u'> {};
 
 /**
  * Serialization rules for signed int values.
  * 
  * A signed int value is encoded as four bytes in little endian (LSB first) order.
  */
-template<> struct TypeInfo<signed int> 
-{
-	static_assert(sizeof(signed int) == 4);
-	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { return s << "i4"; }
-	template<class S> static inline bool write(S& s, const signed int &v) { return s.write(v); }
-	template<class S> static inline bool read(S& s, signed int &v) { return s.read(v); }
-	template<class S> static inline bool skip(S& s) { return s.skip(4); }
-	static constexpr inline size_t size(...) { return 4; }
-	static constexpr inline bool isConstSize() { return true; }
-};
+template<> struct TypeInfo<signed int>: PrimitveIntegerTypeInfoBase<signed int, 'i'> {};
 
 /**
  * Serialization rules for unsigned int values.
  * 
  * A unsigned int value is encoded as four bytes in little endian (LSB first) order.
  */
-template<> struct TypeInfo<unsigned int> 
-{ 
-	static_assert(sizeof(unsigned int) == 4);
-	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { return s << "u4"; }
-	template<class S> static inline bool write(S& s, const unsigned int &v) { return s.write(v); }
-	template<class S> static inline bool read(S& s, unsigned int &v) { return s.read(v); }
-	template<class S> static inline bool skip(S& s) { return s.skip(4); }
-	static constexpr inline size_t size(...) { return 4; }
-	static constexpr inline bool isConstSize() { return true; }
-};
+template<> struct TypeInfo<unsigned int>: PrimitveIntegerTypeInfoBase<unsigned int, 'u'> {};
 
 /**
  * Serialization rules for signed long values.
  * 
  * A signed long value is encoded as eight bytes in little endian (LSB first) order.
  */
-template<> struct TypeInfo<signed long> 
-{
-	static_assert(sizeof(signed long) == 8);
-	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { return s << "i8"; }
-	template<class S> static inline bool write(S& s, const signed long &v) { return s.write(v); }
-	template<class S> static inline bool read(S& s, signed long &v) { return s.read(v); }
-	template<class S> static inline bool skip(S& s) { return s.skip(8); }
-	static constexpr inline size_t size(...) { return 8; }
-	static constexpr inline bool isConstSize() { return true; }
-};
-
-/**
- * Serialization rules for signed long long values.
- * 
- * A signed long value is encoded the same way as a signed long value (are they actually the same?)
- */
-template<> struct TypeInfo<signed long long> : TypeInfo<signed long> {};
+template<> struct TypeInfo<signed long>: PrimitveIntegerTypeInfoBase<signed long, 'i'> {};
 
 /**
  * Serialization rules for unsigned long values.
  * 
  * A unsigned long value is encoded as eight bytes in little endian (LSB first) order.
  */
-template<> struct TypeInfo<unsigned long> 
-{ 
-	static_assert(sizeof(unsigned long) == 8);
-	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { return s << "u8"; }
-	template<class S> static inline bool write(S& s, const unsigned long &v) { return s.write(v); }
-	template<class S> static inline bool read(S& s, unsigned long &v) { return s.read(v); }
-	template<class S> static inline bool skip(S& s) { return s.skip(8); }
-	static constexpr inline size_t size(...) { return 8; }
-	static constexpr inline bool isConstSize() { return true; }
-};
+template<> struct TypeInfo<unsigned long>: PrimitveIntegerTypeInfoBase<unsigned long, 'u'> {};
+
+/**
+ * Serialization rules for signed long long values.
+ * 
+ * A signed long value is encoded the same way as a signed long value (are they actually the same?)
+ */
+template<> struct TypeInfo<signed long long>: PrimitveIntegerTypeInfoBase<signed long long, 'i'> {};
 
 /**
  * Serialization rules for unsigned long long values.
  * 
  * A unsigned long value is encoded the same way as a unsigned long value (are they actually the same?)
  */
-template<> struct TypeInfo<unsigned long long> : TypeInfo<unsigned long> {};
+template<> struct TypeInfo<unsigned long long>: PrimitveIntegerTypeInfoBase<unsigned long long, 'u'> {};
 
 template<size_t n> class CTStr;
 
