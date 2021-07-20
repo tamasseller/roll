@@ -34,25 +34,24 @@ template <
 	template<class> class Pointer,
 	template<class, class> class Registry,
 	class NameRegistry,
-	class IoEngine,
-	class Factory
+	class InputAccessor,
+	class IoEngine
 >
 class Endpoint:
 	Core<
-		typename Factory::Accessor,
+		InputAccessor,
 		Pointer, 
 		Registry, 
-		Endpoint<Pointer, Registry, NameRegistry, IoEngine, Factory>&>,
+		Endpoint<Pointer, Registry, NameRegistry, InputAccessor, IoEngine>&>,
 	NameRegistry
 {
-	using Accessor = typename Factory::Accessor;
 	using CallId = typename Endpoint::Core::CallId;
 
 	const char* doLookup(const char* name, size_t length, CallId cb)
 	{
 		bool buildOk;
 
-		Factory f;
+		auto f = static_cast<IoEngine*>(this)->messageFactory();
 
 		auto data = this->Endpoint::Core::template buildCall<ArrayWriter<char>, Call<CallId>>(
 			f, buildOk, lookupId, ArrayWriter<char>(name, length), Call<CallId>{cb});
@@ -78,8 +77,8 @@ public:
 	 */
 	bool init()
 	{
-		return this->Endpoint::Core::template addCallAt<StreamReader<char, Accessor>, Call<CallId>>(lookupId, []
-		(Endpoint& ep, const MethodHandle &id, StreamReader<char, Accessor> name, Call<CallId> callback)
+		return this->Endpoint::Core::template addCallAt<StreamReader<char, InputAccessor>, Call<CallId>>(lookupId, []
+		(Endpoint& ep, const MethodHandle &id, StreamReader<char, InputAccessor> name, Call<CallId> callback)
 		{
 			auto nameQuery = ep.NameRegistry::beginQuery();
 
@@ -111,7 +110,7 @@ public:
 	 *  - IO error during reading or
 	 *  - Failure to find the requested method in the registry.
 	 */
-	auto process(Accessor& a) {
+	auto process(InputAccessor& a) {
 		return Endpoint::Core::execute(a, *this);
 	}
 
@@ -185,7 +184,7 @@ public:
 	{
 		bool buildOk;
 
-		Factory f;
+		auto f = static_cast<IoEngine*>(this)->messageFactory();
 
 		auto data = this->Endpoint::Core::template buildCall<NominalArgs...>(f, buildOk, call.id, rpc::forward<ActualArgs>(args)...);
 		if(buildOk)

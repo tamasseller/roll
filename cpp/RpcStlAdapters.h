@@ -10,6 +10,8 @@
 
 namespace rpc {
 
+template<class... CbArgs> class Call;
+
 namespace detail
 {
     template<class K, class V>
@@ -161,8 +163,6 @@ namespace detail
             return false;
         }
     };
-
-    template<class... CbArgs> class Call;
 
     template<class...> struct CallEnabler;
 

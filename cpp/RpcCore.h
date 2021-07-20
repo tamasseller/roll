@@ -15,7 +15,7 @@ namespace rpc {
  */
 template
 <
-	class Accessor,
+	class InputAccessor,
 	template<class> class Pointer,
 	template<class, class> class Registry,
 	class... ExtraArgs
@@ -33,7 +33,7 @@ private:
 		/**
 		 * Deserialization and invocation of a registered method.
 		 */
-		virtual const char* invoke(Accessor &a, CallId id, ExtraArgs...) = 0;
+		virtual const char* invoke(InputAccessor &a, CallId id, ExtraArgs...) = 0;
 
 		/**
 		 * The virtual destructor is required because the captured 
@@ -73,7 +73,7 @@ private:
 		 * Uses deserializer helper to parse the arguments and pass them directly 
 		 * to the target method.
 		 */
-		virtual const char* invoke(Accessor &a, CallId id, ExtraArgs... extraArgs) override {
+		virtual const char* invoke(InputAccessor &a, CallId id, ExtraArgs... extraArgs) override {
 			return deserialize<NominalArgs...>(a, target, extraArgs..., MethodHandle(id));
 		}
 	};
@@ -101,7 +101,7 @@ public:
 	 *   - Parse error during method identifier or argument parsing.
 	 *   - Failure to find the method registration corresponding to the identifier.
 	 */
-	const char* execute(Accessor &a, ExtraArgs... args)
+	const char* execute(InputAccessor &a, ExtraArgs... args)
 	{
 		CallId id;
 

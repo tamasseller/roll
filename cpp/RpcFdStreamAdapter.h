@@ -107,9 +107,16 @@ struct PreallocatedMemoryBufferStreamWriterFactory
 class FdStreamAdapter
 {
     int wfd = -1, rfd = -1;
+
 public:
+    using InputAccessor = PreallocatedMemoryBufferStream::Accessor;
+
     FdStreamAdapter(const FdStreamAdapter&) = delete;
     inline FdStreamAdapter(int wfd, int rfd): wfd(wfd), rfd(rfd) {}
+
+    inline auto messageFactory() {
+    	return PreallocatedMemoryBufferStreamWriterFactory{};
+    }
 
     bool send(PreallocatedMemoryBufferStream&& data)
     {

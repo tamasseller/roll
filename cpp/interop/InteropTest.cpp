@@ -84,7 +84,7 @@ static inline void runStreamGeneratorTest(std::shared_ptr<Rpc> uut)
         void runTest(decltype(uut)& uut) 
         {
             int idx = 0;
-            for(auto v: uut->asyncCall(std::get<1>(methods), 5).get())
+            for(auto v: uut->asyncCall(std::get<1>(methods), 5u).get())
             {
                 idx++;
                 assert(v == state);
@@ -98,8 +98,8 @@ static inline void runStreamGeneratorTest(std::shared_ptr<Rpc> uut)
         }
     };
 
-    Tester tc1{3, 31, uut->asyncCall(open, 3, 31).get()};
-    Tester tc2{5, 17, uut->asyncCall(open, 5, 17).get()};
+    Tester tc1{3, 31, uut->asyncCall(open, uint8_t(3), uint8_t(31)).get()};
+    Tester tc2{5, 17, uut->asyncCall(open, uint8_t(5), uint8_t(17)).get()};
 
     for(int i = 0; i<10; i++)
         tc1.runTest(uut);
@@ -119,7 +119,7 @@ static inline void runStreamGeneratorTest(std::shared_ptr<Rpc> uut)
 
 std::thread runInteropTests(std::shared_ptr<Rpc> uut)
 {
-    uut->provide(syms::echo, [](Rpc::Endpoint& h, const rpc::MethodHandle &self, const auto &str, const auto &cb) {
+    uut->provide(syms::echo, [](Rpc::Endpoint& h, const rpc::MethodHandle &self, const std::string &str, rpc::Call<std::string> cb) {
         return h.call(cb, str);
     });
 

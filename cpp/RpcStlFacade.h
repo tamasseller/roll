@@ -32,15 +32,19 @@ public:
  * the STL implementation. When tighter control ver heap usage is a requirement alternate
  * implementations for the dependencies can be used.
  */
-template<class IoEngine, class Factory>
-class StlFacade: Endpoint<
-    detail::StlAutoPointer, 
-    detail::HashMapRegistry,
-    detail::HashMapBasedNameDictionary, 
-    IoEngine,
-    Factory
->{
-	friend IoEngine;
+template<class Child, class Io>
+class StlFacade:
+	public Io,
+	public Endpoint<
+		detail::StlAutoPointer,
+		detail::HashMapRegistry,
+		detail::HashMapBasedNameDictionary,
+		typename Io::InputAccessor,
+		Child
+	>
+{
+	friend Child;
+	friend Io;
     friend typename StlFacade::Endpoint;
 
 public:
@@ -56,17 +60,17 @@ public:
     using Endpoint = typename StlFacade::Endpoint;
 
     /**
-     * Accessor to the underlying IoEngine object.
+     * Accessor to the underlying Child object.
      * 
      * Needed due to private baseclass. 
      */
-    inline constexpr operator IoEngine*() { return (IoEngine*)this; }
+    inline constexpr operator Child*() { return (Child*)this; }
 
     /**
      * Wrapper around Endpoint::init.
      */
     template<class... Args>
-    StlFacade(Args&&... args): StlFacade::Endpoint(std::forward<Args>(args)...) {
+    StlFacade(Args&&... args): Io(std::forward<Args>(args)...) {
         assert(this->Endpoint::init());
     }
 
@@ -120,7 +124,7 @@ public:
 	}
 
     /**
-     * Wrapper for Endpoint::call, with no special callback handling.
+     * Wrapper for Endpoint::call - with no special callback handling.
      * 
      * Throws instead of returning error.
      */
@@ -128,7 +132,9 @@ public:
     inline void simpleCall(const Call<NominalArgs...> &call, ActualArgs&&... args)
 	{
         if(auto err = this->StlFacade::Endpoint::call(call, std::forward<ActualArgs>(args)...))
-            throw RpcException(err);
+        {
+        	throw RpcException(err);
+        }
     }
 
     /**
@@ -171,7 +177,7 @@ public:
     };
 
     /**
-     * Wrapper for Endpoint::call, value returned via callback case.
+     * Wrapper for Endpoint::call - value returned via callback case.
      * 
      * Can only be used when the last argument is a callback handle.
      * Expects to be called with the arguments of the signature except 

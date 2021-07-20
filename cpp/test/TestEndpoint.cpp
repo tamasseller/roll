@@ -80,13 +80,15 @@ struct MockMethodDictionary
     }
 };
 
-struct Uut: rpc::Endpoint<
-        MockSmartPointer, 
-        MockRegistry,
-        MockMethodDictionary, 
-        Uut,
-        MockStreamWriterFactory
-> {
+struct Uut:
+		rpc::Endpoint<
+			MockSmartPointer,
+			MockRegistry,
+			MockMethodDictionary,
+			MockStreamWriterFactory::Accessor,
+			Uut
+		>
+{
     std::list<MockStream> sent;
 
     int failAt = 0;
@@ -101,6 +103,10 @@ struct Uut: rpc::Endpoint<
         
         sent.emplace_back(std::move(s));
         return true;
+    }
+
+    inline auto messageFactory() {
+    	return MockStreamWriterFactory{};
     }
 };
 
