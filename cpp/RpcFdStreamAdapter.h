@@ -76,7 +76,8 @@ public:
     {
         auto a = access();
         assert(size == (size_t)((uint32_t)size));
-        assert(rpc::VarUint4::write(a, size));
+        auto lengthWriteOk = rpc::VarUint4::write(a, size);
+        assert(lengthWriteOk);
         start = a.ptr;
     };
 };

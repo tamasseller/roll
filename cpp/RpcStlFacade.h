@@ -71,7 +71,8 @@ public:
      */
     template<class... Args>
     StlFacade(Args&&... args): Io(std::forward<Args>(args)...) {
-        assert(this->Endpoint::init());
+    	auto epInitOk = this->Endpoint::init();
+    	assert(epInitOk);
     }
 
     /**
@@ -200,7 +201,8 @@ public:
 
         if(auto err = this->StlFacade::Endpoint::call(call, std::forward<ActualArgs>(args)..., id))
         {
-            assert(this->StlFacade::Endpoint::uninstall(id));
+        	auto uninstallOk = this->StlFacade::Endpoint::uninstall(id);
+            assert(uninstallOk);
             throw RpcException(err);
         }
 
