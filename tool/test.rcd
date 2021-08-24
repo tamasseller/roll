@@ -1,0 +1,8 @@
+bar([{[i1] str, u4 id}] elements): i4;
+foo(i4 num, [i1] name);
+nop();
+set(i2 v);
+now(): u8;
+name(): [i1];
+ifs(): [{[i1] name, i4 id, u4 corr}];
+stupid({i1 s} s): {[{[{i1 a}] c}] e};

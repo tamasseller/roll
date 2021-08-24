@@ -19,4 +19,4 @@ LIBS += pthread
 
 COVROOT = ..
 
-include ultimate-makefile/Makefile.ultimate
+include ../../ultimate-makefile/Makefile.ultimate

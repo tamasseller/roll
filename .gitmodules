@@ -1,9 +1,6 @@
 [submodule "cpp/test/ultimate-makefile"]
-	path = cpp/test/ultimate-makefile
+	path = ultimate-makefile
 	url = http://github.com/tamasseller/ultimate-makefile
 [submodule "cpp/test/pet"]
 	path = cpp/test/pet
 	url = http://github.com/tamasseller/pet
-[submodule "cpp/interop/ultimate-makefile"]
-	path = cpp/interop/ultimate-makefile
-	url = http://github.com/tamasseller/ultimate-makefile

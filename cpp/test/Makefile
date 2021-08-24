@@ -34,4 +34,4 @@ LD=$(CXX)
 COVROOT = ..
 
 include pet/mod.mk
-include ultimate-makefile/Makefile.ultimate
+include ../../ultimate-makefile/Makefile.ultimate
