@@ -58,8 +58,12 @@ int main(int argc, char* argv[])
 
 				antlr4::ANTLRInputStream input(file);
 				rpcLexer lexer(&input);
+				antlr4::ConsoleErrorListener errorListener;
+				lexer.addErrorListener(&errorListener);
 				antlr4::CommonTokenStream tokens(&lexer);
 				rpcParser parser(&tokens);
+				parser.addErrorListener(&errorListener);
+
 				return it->second.second->run(Ast::from(parser.rpc()), {argv + 2, argv + argc});
 			}
 			catch(const std::exception& exc)

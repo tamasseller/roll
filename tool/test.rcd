@@ -1,8 +1,19 @@
-bar([{[i1] str, u4 id}] elements): i4;
-foo(i4 num, [i1] name);
+string = [i1];
+bar(elements :[{str: string, id : u4}]): i4;
+foo(num: i4, name:[i1] );
 nop();
-set(i2 v);
+set(v: i2);
 now(): u8;
 name(): [i1];
-ifs(): [{[i1] name, i4 id, u4 corr}];
-stupid({i1 s} s): {[{[{i1 a}] c}] e};
+ifs(): [{name:[i1] , id:i4 ,corr:u4}];
+stupid(s: {s:i1}): {e:[{c:[{a:i1}]}]}; // 456
+
+session < !echo(v:string); @echo(v:string)  >;
+
+acquistion < @echo(data:[u1])  >;
+
+tdp
+< 
+	@onInterface(v:[string], id: i4, corr:u4);
+	@onPeer(corr:u4, v:string)
+>
