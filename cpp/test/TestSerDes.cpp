@@ -8,6 +8,7 @@
 #include "RpcArrayWriter.h"
 #include "RpcCollectionGenerator.h"
 #include "RpcCTStr.h"
+#include "RpcStruct.h"
 
 #include "MockStream.h"
 
@@ -517,3 +518,56 @@ TEST(SerDes, CollectionGenerator)
 	CHECK(res == nullptr);
 	CHECK(done);
 }
+
+struct StructTest
+{
+	int n;
+	std::string str;
+
+	inline bool operator ==(const StructTest& o) const {
+		return n == o.n && str == o.str;
+	}
+};
+
+namespace rpc {
+
+template<> struct TypeInfo<StructTest>: StructTypeInfo<StructTest,
+		StructMember<&StructTest::n>,
+		StructMember<&StructTest::str>
+	>{};
+}
+
+TEST(SerDes, Struct)
+{
+    test(StructTest{1337, "leet"});
+}
+
+struct NestedStructTest
+{
+	StructTest sa, sb;
+	std::string explanation;
+
+	inline bool operator ==(const NestedStructTest& o) const {
+		return sa == o.sa && sb == o.sb && explanation == o.explanation;
+	}
+};
+
+namespace rpc {
+
+template<> struct TypeInfo<NestedStructTest>: StructTypeInfo<NestedStructTest,
+		StructMember<&NestedStructTest::sa>,
+		StructMember<&NestedStructTest::sb>,
+		StructMember<&NestedStructTest::explanation>
+	>{};
+}
+
+TEST(SerDes, NestedStructs)
+{
+    test(NestedStructTest
+	{
+		{0x1337, "l33t"},
+		{1337, "1ee7"},
+		"foobar"
+	});
+}
+
