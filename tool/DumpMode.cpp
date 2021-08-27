@@ -245,15 +245,7 @@ CLI_APP(dump, "parse and dump descriptor in textual format")
 		   opts.colored = false;
 		}
 
-		antlr4::ANTLRInputStream input(*opts.input);
-		rpcLexer lexer(&input);
-		antlr4::ConsoleErrorListener errorListener;
-		lexer.addErrorListener(&errorListener);
-		antlr4::CommonTokenStream tokens(&lexer);
-		rpcParser parser(&tokens);
-		parser.addErrorListener(&errorListener);
-		auto ast = Ast::from(parser.rpc());
-
+		auto ast = Ast::fromText(*opts.input);
 		std::transform(ast.items.begin(), ast.items.end(), std::ostream_iterator<std::string>(*opts.output, "\n"), [&opts](const auto& s){
 			return std::visit([&opts](const auto &s){return formatItem(opts, 0, s); }, s);
 		});

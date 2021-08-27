@@ -1,12 +1,10 @@
 #ifndef RPC_TOOL_AST_H_
 #define RPC_TOOL_AST_H_
 
-#include "rpcParser.h"
-#include "rpcLexer.h"
-
 #include <vector>
 #include <string>
 #include <memory>
+#include <istream>
 #include <variant>
 
 struct Ast
@@ -18,16 +16,11 @@ struct Ast
 
 	using Type = std::pair<std::string, std::variant<Primitive, Collection, Aggreagete>>;
 
-	struct SemanticParserState; // Internal state.
-
 	/// Single 1/2/4/8 byte signed/unsigned word (primitive integers).
 	struct Primitive
 	{
 		const bool isSigned;
 		const int length;
-
-		static constexpr inline int getLength(char c);
-		Primitive(const std::string& str);
 	};
 
 	/// Zero or more elements of the same type (dynamic array).
@@ -45,45 +38,37 @@ struct Ast
 	{
 		const std::string name;
 		const Type type;
-
-		Var(const SemanticParserState &sps, rpcParser::VarContext* ctx);
 	};
 
 	struct Call
 	{
 		const std::string name;
 		const std::vector<Var> args;
-
-		Call(const SemanticParserState &sps, rpcParser::SymbolContext* ctx);
 	};
 
 	struct Pull: Call
 	{
 		const Type returnType;
-		Pull(const SemanticParserState &sps, rpcParser::GetterContext* ctx);
+		inline Pull(Call call, Type returnType): Call(call), returnType(returnType) {}
 	};
 
 	struct Alias: Type {};
 
 	struct Session
 	{
-		struct ForwardCall: Call { using Call::Call; };
-		struct CallBack: Call { using Call::Call; };
+		struct ForwardCall: Call { inline ForwardCall(Call c): Call(c) {}; };
+		struct CallBack: Call { inline CallBack(Call c): Call(c) {}; };
 
 		using Item = std::variant<ForwardCall, CallBack>;
 
 		const std::string name;
 		const std::vector<Item> items;
-
-		static inline auto parse(const SemanticParserState &sps, const std::vector<rpcParser::SessionItemContext*> &items);
-		Session(const SemanticParserState &sps, rpcParser::SessionContext* ctx);
 	};
 
 	using Item = std::variant<Call, Pull, Alias, Session>;
-
 	const std::vector<Item> items;
 
-	static Ast from(rpcParser::RpcContext* ctx);
+	static Ast fromText(std::istream&);
 };
 
 #endif /* RPC_TOOL_AST_H_ */
