@@ -1,8 +1,13 @@
-#include "DumpMode.h"
+#include "CliApp.h"
+#include "Ast.h"
 
 #include <iterator>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <functional>
+
+#include <unistd.h>
 
 enum class Highlight
 {
@@ -14,6 +19,13 @@ struct Options
 	bool colored = true;
 	bool pretty = true;
 	int indentStep = 4;
+	std::istream *input;
+	std::ostream *output;
+
+	inline Options(const Options&) = delete;
+	inline Options(Options&&) = delete;
+
+	inline Options(): input(&std::cin), output(&std::cout) {}
 
 private:
 	static constexpr const char* reset = "\x1b[0m";
@@ -135,7 +147,7 @@ static inline std::string typeKindToString(const Options& opts, const int n, con
 
 static inline std::string typeName(const Options& opts, const int n, const Ast::Type& t, bool useNameIfNotEmpty)
 {
-	const auto trueType = std::visit([n, opts](const auto& x){ return typeKindToString(opts, n, x); }, t.second);
+	const auto trueType = std::visit([n, &opts](const auto& x){ return typeKindToString(opts, n, x); }, t.second);
 
 	if(useNameIfNotEmpty && t.first.length())
 	{
@@ -180,20 +192,74 @@ static inline std::string formatItem(const Options& opts, const int n, const Ast
 {
 	return opts.indent(n) + opts.colorize(s.name, Highlight::Session) +
 		opts.formatNewlineIndentDelimit(n, list(opts, n + 1, s.items, [](const Options& opts, const int n, const Ast::Session::Item& i){
-			return std::visit([opts, n](auto& v) {return formatSessionItem(opts, n, v);}, i);
+			return std::visit([&opts, n](auto& v) {return formatSessionItem(opts, n, v);}, i);
 		}), '<', '>') + ";";
 }
 
-int DumpMode::run(Ast ast, std::vector<std::string> args) const
+CLI_APP(dump, "parse and dump descriptor in textual format")
 {
 	Options opts;
+	std::ifstream inputFile;
+	std::ofstream outputFile;
 
-	if(std::find(args.begin(), args.end(), "--no-colors") != args.end())
-		opts.colored = false;
-
-	std::transform(ast.items.begin(), ast.items.end(), std::ostream_iterator<std::string>(std::cout, "\n"), [opts](const auto& s){
-		return std::visit([opts](const auto &s){return formatItem(opts, 0, s); }, s);
+	this->addOptions({"-i", "--input"}, "Set input file", [&opts, &inputFile](const std::string &str)
+	{
+		if(!(inputFile = std::ifstream(str)))
+		{
+			throw std::runtime_error("Input file '" + str + "' could not be opened [default: standard input]");
+		}
+		else
+		{
+			opts.input = &inputFile;
+		}
 	});
 
-	return 0;
+	this->addOptions({"-o", "--output"}, "Set output file [default: standard output]", [&opts, &outputFile](const std::string &str)
+	{
+		if(!(outputFile = std::ofstream(str)))
+		{
+			throw std::runtime_error("Output file '" + str + "' could not be opened");
+		}
+		else
+		{
+			opts.output = &outputFile;
+			opts.colored = false;
+		}
+	});
+
+	this->addOptions({"-n", "--no-colors"}, "Do not emit terminal color codes for output [default: enabled standard output, disabled for file]", [&opts]()
+	{
+		opts.colored = false;
+	});
+
+	this->addOptions({"-u", "--ugly", "--no-wrap"}, "Do not break argument/members lists in multiple lines [default: do it]", [&opts]()
+	{
+		opts.pretty = false;
+	});
+
+	if(this->processCommandLine())
+	{
+		if (!isatty(fileno(stdout)))
+		{
+		   std::cerr << "Output is not a terminal, disabling coloring. Note: the -o option is available to save output to file." << std::endl;
+		   opts.colored = false;
+		}
+
+		antlr4::ANTLRInputStream input(*opts.input);
+		rpcLexer lexer(&input);
+		antlr4::ConsoleErrorListener errorListener;
+		lexer.addErrorListener(&errorListener);
+		antlr4::CommonTokenStream tokens(&lexer);
+		rpcParser parser(&tokens);
+		parser.addErrorListener(&errorListener);
+		auto ast = Ast::from(parser.rpc());
+
+		std::transform(ast.items.begin(), ast.items.end(), std::ostream_iterator<std::string>(*opts.output, "\n"), [&opts](const auto& s){
+			return std::visit([&opts](const auto &s){return formatItem(opts, 0, s); }, s);
+		});
+
+		return 0;
+	}
+
+	return -1;
 }

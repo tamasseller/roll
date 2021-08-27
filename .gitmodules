@@ -4,3 +4,6 @@
 [submodule "cpp/test/pet"]
 	path = cpp/test/pet
 	url = http://github.com/tamasseller/pet
+[submodule "cli-base"]
+	path = cli-base
+	url = http://github.com/tamasseller/cli-base

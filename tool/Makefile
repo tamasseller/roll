@@ -1,4 +1,5 @@
 OUTPUT = rpc-tool
+all: $(OUTPUT)
 
 OBJDIR = .o
 
@@ -6,9 +7,15 @@ SOURCES += main.cpp
 SOURCES += Ast.cpp
 SOURCES += DumpMode.cpp
 
+
 GENDIR = .gen
 CLEAN_EXTRA += $(GENDIR)
 SOURCES += $(GENDIR)/rpcLexer.cpp $(GENDIR)/rpcParser.cpp
+
+Ast.cpp: Ast.h
+
+Ast.h: $(GENDIR)/rpcParser.h $(GENDIR)/rpcLexer.h
+
 LIBS += antlr4-runtime
 
 INCLUDE_DIRS += .
@@ -31,8 +38,7 @@ LD=$(CXX)
 
 COVROOT = ..
 
-#all: $(OUTPUT)
-	
+include ../cli-base/mod.mk
 include ../ultimate-makefile/Makefile.ultimate
 
 $(abspath $(GENDIR))/%Lexer.cpp $(abspath $(GENDIR))/%Parser.cpp \
