@@ -21,7 +21,7 @@ CLI_APP(serialize, "parse and convert descriptor to dense binary format")
 		auto ast = parse(*opts.input);
 		auto data = serialize(ast);
 
-		std::istringstream is(data);
+		std::istringstream is(data, std::ios::binary | std::ios::in);
 		auto rec = deserialize(is);
 		assert(rec == ast);
 

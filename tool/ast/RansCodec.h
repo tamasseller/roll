@@ -13,53 +13,66 @@ protected:
 	static constexpr uint32_t mask = (1u << rangeScaleBits) - 1;
 };
 
-template<char count>
-struct StaticConstantRansModel
+template<unsigned char count>
+struct StaticConstantRansModel: RansCodec
 {
+	static inline uint32_t start(uint32_t idx) {
+		return (idx << (rangeScaleBits)) / (uint32_t)count;
+	}
+
+	static inline uint32_t approx(uint32_t idx) {
+		return (idx * count) >> (rangeScaleBits);
+	}
+
 	struct Symstat
 	{
 		size_t cummulated, width;
 
 		inline Symstat(unsigned int idx):
-			cummulated(0x10000u * (idx + 0) / (unsigned int)(unsigned char)count),
-			width((0x10000u * (idx + 1) / (unsigned int)(unsigned char)count) - cummulated) {}
+			cummulated(start(idx)),
+			width(start(idx + 1) - cummulated) {}
 	};
 
-	static inline Symstat predict(char c) {
-		assert(c < count);
+	static inline Symstat predict(char c)
+	{
+		assert(0 <= c && c < count);
 		return Symstat((unsigned char)c);
 	}
 
 	static inline Symstat identify(size_t in, char &c)
 	{
-		c = (in * count + 0x7fffu) / 0x10000u;
+		auto u = approx(in);
+		c = ((start(u + 1) <= in) ? (u + 1) : u);
 
-		if (const auto thres = (0x10000u * c) / count;in < thres)
-		{
-			c--;
-		}
-
+		assert(start(c) <= in && in < start(c + 1));
 		return predict(c);
 	}
 };
 
-template<class It>
 class RansDecoder: RansCodec
 {
 	uint32_t x;
-	It in;
+	std::istream &in;
+
+	unsigned char read()
+	{
+		unsigned char ret;
+		in.read((char*)&ret, 1);
+		return ret;
+	}
 
 public:
-	inline RansDecoder(It&& in): in(in)
+	inline RansDecoder(std::istream &in): in(in)
 	{
-		x = (unsigned char)*this->in++ << 0;
-		x |= (unsigned char)*this->in++ << 8;
-		x |= (unsigned char)*this->in++ << 16;
-		x |= (unsigned char)*this->in++ << 24;
+		x = read() << 0;
+		x |= read() << 8;
+		x |= read() << 16;
+		x |= read() << 24;
 	}
 
 	template<class Model>
-	inline char get(Model& model) {
+	inline char get(Model& model)
+	{
 		char ret;
 		auto low = x & mask;
 		auto r = model.identify(low, ret);
@@ -67,7 +80,7 @@ public:
 		x = r.width * (x >> rangeScaleBits) + low - r.cummulated;
 
 		while (x < normalizedLowerBound)
-			x = (x << 8) | (unsigned char)*in++;
+			x = (x << 8) | read();
 
 		return ret;
 	}
@@ -76,6 +89,7 @@ public:
 		return x == normalizedLowerBound;
 	}
 };
+
 
 class RansEncoder: RansCodec, public std::unique_ptr<char[]>
 {

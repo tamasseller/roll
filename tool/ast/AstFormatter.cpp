@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iterator>
 #include <algorithm>
+#include <numeric>
 
 static constexpr const char* resetColor = "\x1b[0m";
 
@@ -166,15 +167,17 @@ static inline std::string formatSessionItem(const FormatOptions& opts, const int
 }
 
 static inline std::string formatSessionItem(const FormatOptions& opts, const int n, const Ast::Session::Ctor& s) {
-	return "@" + signature(opts, n, s);
+	return signature(opts, n, s);
 }
 
 static inline std::string formatItem(const FormatOptions& opts, const int n, const Ast::Session& s)
 {
-	return opts.indent(n) + opts.colorize(s.name, FormatOptions::Highlight::Session) +
-		opts.formatNewlineIndentDelimit(n, list(opts, n + 1, s.items, [](const FormatOptions& opts, const int n, const Ast::Session::Item& i){
-			return std::visit([&opts, n](auto& v) {return formatSessionItem(opts, n, v);}, i);
-		}), '<', '>') + ";";
+	return opts.indent(n) + opts.colorize(s.name, FormatOptions::Highlight::Session)
+			+ "\n" + opts.indent(n) + "<\n"
+			+ std::accumulate(s.items.begin(), s.items.end(), std::string{}, [n, &opts](const std::string a, const auto &i){
+				return a + opts.indent(n + 1) + std::visit([&opts, n](auto& v) {return formatSessionItem(opts, n + 1, v);}, i) + ";\n";
+			})
+			+ opts.indent(n) + ">;";
 }
 
 std::string format(const FormatOptions& opts, const Ast& ast)

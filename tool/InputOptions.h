@@ -16,7 +16,7 @@ public:
 	{
 		h->addOptions({"-i", "--input"}, "Set input file", [this](const std::string &str)
 		{
-			if(!(this->inputFile = std::ifstream(str)))
+			if(!(this->inputFile = std::ifstream(str, std::ios::binary)))
 			{
 				throw std::runtime_error("Input file '" + str + "' could not be opened [default: standard input]");
 			}

@@ -16,7 +16,7 @@ public:
 	{
 		h->addOptions({"-o", "--output"}, "Set output file [default: standard output]", [this](const std::string &str)
 		{
-			if(!(this->outputFile = std::ofstream(str)))
+			if(!(this->outputFile = std::ofstream(str, std::ios::binary)))
 			{
 				throw std::runtime_error("Output file '" + str + "' could not be opened");
 			}

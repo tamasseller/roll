@@ -1,13 +1,13 @@
-string = [i1];
-ztring = string;
-bar(elements :[{str: string, id : u4}]): i4;
-foo(num: i4, name:[i1] );
+string = [i1] /* can this be a comment? */;
+ztring = string ;
+bar(elements :[{str: string /* documentation comment */, id : u4 /* at predefined locations */}]): i4 /* this returns something */;
+foo(num: i4, name:[i1] ) /* this is foo */;
 nop();
 set(v: i2);
 now(): u8;
 name(): [i1];
 ifs(): [{name:[i1] , id:i4 ,corr:u4}];
-stupid(s: {s:i1}): {e:[{c:[{a:i1}]}]}; // 456
+stupid(s: {s:i1}): {e:[{c:[{a:i1}]}]}; 
 
 session < !echo(v:string); @echo(v:string)  >;
 
@@ -32,5 +32,5 @@ tdp
 	start(queryId: u4): {hostId: HostId, names: [string]};
 	@onInterface(netifId: NetifId, ifNum: i4, names: [string]);
 	@onPeer(hostId: HostId, v:string)
->
+>;
 
