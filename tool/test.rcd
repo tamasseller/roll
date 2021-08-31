@@ -1,4 +1,5 @@
 string = [i1];
+ztring = string;
 bar(elements :[{str: string, id : u4}]): i4;
 foo(num: i4, name:[i1] );
 nop();
@@ -10,10 +11,26 @@ stupid(s: {s:i1}): {e:[{c:[{a:i1}]}]}; // 456
 
 session < !echo(v:string); @echo(v:string)  >;
 
-acquistion < @echo(data:[u1])  >;
+getChannels(): [string];
+
+acquistion 
+<
+	start(channel: string);
+	
+	!set(property: string, value: string);
+	!get(property: string);
+	@onPropertyValue(property: string, value: string);
+	
+	@onData(data:[u1]);
+>;
+
+HostId = u4;
+NetifId = u4;
 
 tdp
-< 
-	@onInterface(v:[string], id: i4, corr:u4);
-	@onPeer(corr:u4, v:string)
+<
+	start(queryId: u4): {hostId: HostId, names: [string]};
+	@onInterface(netifId: NetifId, ifNum: i4, names: [string]);
+	@onPeer(hostId: HostId, v:string)
 >
+

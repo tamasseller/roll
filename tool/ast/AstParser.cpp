@@ -1,4 +1,5 @@
-#include "Ast.h"
+#include "AstParser.h"
+#include "AstRansSerDesCodec.h"
 
 #include "rpcParser.h"
 #include "rpcLexer.h"
@@ -37,12 +38,20 @@ struct SemanticParser
 		return ret;
 	}
 
-	inline Ast::Call makeCall(rpcParser::SymbolContext* ctx) const {
+	inline Ast::Action makeCall(rpcParser::ActionContext* ctx) const {
 		return {ctx->name->getText(), parseVarList(ctx->args->vars.begin(), ctx->args->vars.end())};
 	}
 
-	inline Ast::Pull makePull(rpcParser::GetterContext* ctx) const {
-		return Ast::Pull(makeCall(ctx->sym), resolveType(ctx->ret));
+	inline Ast::Function makeFunc(rpcParser::FunctionContext* ctx) const
+	{
+		if(ctx->ret)
+		{
+			return Ast::Function(makeCall(ctx->call), resolveType(ctx->ret));
+		}
+		else
+		{
+			return Ast::Function(makeCall(ctx->call));
+		}
 	}
 
 	inline Ast::Session makeSession(rpcParser::SessionContext* ctx) const {
@@ -61,11 +70,12 @@ struct SemanticParser
 		}
 		else if(auto data = ctx->a)
 		{
-			return {name, Ast::Aggreagete{parseVarList(data->members->vars.begin(), data->members->vars.end())}};
+			return {name, Ast::Aggregate{parseVarList(data->members->vars.begin(), data->members->vars.end())}};
 		}
-		else if(auto data = ctx->n)
+		else
 		{
-			const auto name = data->getText();
+			const auto name = ctx->n->getText();
+
 			if(auto it = aliases.find(name); it != aliases.end())
 			{
 				return it->second;
@@ -100,6 +110,10 @@ struct SemanticParser
 			{
 				return Ast::Session::CallBack(makeCall(d->sym));
 			}
+			else if(auto d = i->ctr)
+			{
+				return Ast::Session::CallBack(makeFunc(d));
+			}
 
 			throw std::runtime_error("Internal error: unknown session item kind");
 		});
@@ -109,17 +123,13 @@ struct SemanticParser
 
 	inline Ast::Item processItem(rpcParser::ItemContext* s)
 	{
-		if(auto d = s->push)
+		if(auto d = s->func)
 		{
-			return makeCall(d);
-		}
-		else if(auto d = s->pull)
-		{
-			return makePull(d);
+			return makeFunc(d);
 		}
 		else if(auto d = s->alias)
 		{
-			return Ast::Alias{addAlias(d)};
+			return Ast::Alias{d->name->getText(), addAlias(d)};
 		}
 		else
 		{
@@ -132,25 +142,26 @@ public:
 	{
 		SemanticParser sps;
 		std::vector<Ast::Item> items;
-
-		for(auto s: ctx->items)
-		{
-			items.push_back(sps.processItem(s));
-		}
-
+		std::transform(ctx->items.begin(), ctx->items.end(), std::back_inserter(items), [&sps](auto s){return sps.processItem(s); });
 		return {std::move(items)};
 	}
 };
 
-Ast Ast::fromText(std::istream& is)
+Ast parse(std::istream& is)
 {
-	antlr4::ANTLRInputStream input(is);
-	rpcLexer lexer(&input);
-	antlr4::ConsoleErrorListener errorListener;
-	lexer.addErrorListener(&errorListener);
-	antlr4::CommonTokenStream tokens(&lexer);
-	rpcParser parser(&tokens);
-	parser.addErrorListener(&errorListener);
-	return SemanticParser::parse(parser.rpc());
+	if(isprint(is.peek()))
+	{
+		antlr4::ANTLRInputStream input(is);
+		rpcLexer lexer(&input);
+		antlr4::ConsoleErrorListener errorListener;
+		lexer.addErrorListener(&errorListener);
+		antlr4::CommonTokenStream tokens(&lexer);
+		rpcParser parser(&tokens);
+		parser.addErrorListener(&errorListener);
+		return SemanticParser::parse(parser.rpc());
+	}
+	else
+	{
+		return deserialize(is);
+	}
 }
-

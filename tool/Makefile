@@ -4,9 +4,12 @@ all: $(OUTPUT)
 OBJDIR = .o
 
 SOURCES += main.cpp
-SOURCES += Ast.cpp
-SOURCES += DumpMode.cpp
+SOURCES += Dump.cpp
+SOURCES += Serialize.cpp
 
+SOURCES += ast/AstParser.cpp
+SOURCES += ast/AstFormatter.cpp
+SOURCES += ast/AstRansSerDesCodec.cpp
 
 GENDIR = .gen
 CLEAN_EXTRA += $(GENDIR)
