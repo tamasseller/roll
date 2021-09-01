@@ -7,7 +7,7 @@
 #include <iterator>
 
 static StaticConstantRansModel<char(4)> rootSelectorModel;
-static StaticConstantRansModel<char(5)> typeSelectorModel;
+static StaticConstantRansModel<char(4)> typeSelectorModel;
 static StaticConstantRansModel<char(8)> primitiveSelectorModel;
 static StaticConstantRansModel<char(4)> sessionItemSelectorModel;
 static StaticConstantRansModel<char(53)> intialIdCharModel;
@@ -117,9 +117,15 @@ struct RansSink: AstSerializer<RansSink>
 		});
 	}
 
-	inline void write(TypeSelector v)
+	inline void write(TypeRefSelector v)
 	{
+		items.push_back([v](RansEncoder & enc){
+			enc.put(typeSelectorModel, (int)v);
+		});
+	}
 
+	inline void write(TypeDefSelector v)
+	{
 		items.push_back([v](RansEncoder & enc){
 			enc.put(typeSelectorModel, (int)v);
 		});
@@ -191,8 +197,12 @@ struct RansSource: AstDeserializer<RansSource>, RansDecoder
 		v = (RootSelector)this->get(rootSelectorModel);
 	}
 
-	inline void read(TypeSelector &v) {
-		v = (TypeSelector)this->get(typeSelectorModel);
+	inline void read(TypeRefSelector &v) {
+		v = (TypeRefSelector)this->get(typeSelectorModel);
+	}
+
+	inline void read(TypeDefSelector &v) {
+		v = (TypeDefSelector)this->get(typeSelectorModel);
 	}
 
 	inline void read(PrimitiveSelector &v) {
@@ -320,12 +330,8 @@ void selftest()
 		assert(r == idx && s == idx && t == idx);
 	}
 
-	AstSerDes::TypeSelector typeSelectorValues[] = {AstSerDes::TypeSelector::Primitive, AstSerDes::TypeSelector::Collection, AstSerDes::TypeSelector::Aggregate, AstSerDes::TypeSelector::Alias, AstSerDes::TypeSelector::None};
-	static_assert(sizeof(typeSelectorValues) / sizeof(typeSelectorValues[0]) == 5);
-
-	for(auto c: typeSelectorValues)
+	for(int idx = 0; idx < 3; idx++)
 	{
-		const auto idx = (char)(int)c;
 		const auto range = typeSelectorModel.predict(idx);
 
 		char r, s, t;

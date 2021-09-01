@@ -12,8 +12,12 @@ struct AstSerDes
 		Func, Type, Session, None
 	};
 
-	enum class TypeSelector {
-		Primitive, Collection, Aggregate, Alias, None
+	enum class TypeRefSelector {
+		Primitive, Collection, Alias, None
+	};
+
+	enum class TypeDefSelector {
+		Primitive, Collection, Aggregate, Alias
 	};
 
 	enum class PrimitiveSelector {
@@ -36,30 +40,16 @@ class AstSerializer: public AstSerDes
 	{
 		for(const auto &i: items)
 		{
-			type(i.type);
+			typeRef(i.type);
 			child()->writeIdentifier(i.name);
 			child()->writeText(i.docs);
 		}
 
-		child()->write(TypeSelector::None);
+		child()->write(TypeRefSelector::None);
 	}
 
-	inline void kind(const Ast::Aggregate& a)
+	inline void writePrimitive(const Ast::Primitive& a)
 	{
-		child()->write(TypeSelector::Aggregate);
-		varList(a.members);
-	}
-
-	inline void kind(const Ast::Collection& a)
-	{
-		child()->write(TypeSelector::Collection);
-		type(*a.elementType);
-	}
-
-	inline void kind(const Ast::Primitive& a)
-	{
-		child()->write(TypeSelector::Primitive);
-
 		if(a.isSigned)
 		{
 			if(a.length == 1)
@@ -84,29 +74,66 @@ class AstSerializer: public AstSerDes
 		}
 	}
 
-	inline void type(const Ast::Type &t, std::string forbiddenName = {})
+	inline void refKind(const Ast::Primitive& a)
 	{
-		if(t.first != forbiddenName)
-		{
-			child()->write(TypeSelector::Alias);
-			child()->writeIdentifier(t.first);
-		}
-		else
-		{
-			std::visit([this](const auto& t){kind(t);}, t.second);
-		}
+		child()->write(TypeRefSelector::Primitive);
+		writePrimitive(a);
 	}
 
-	inline void retType(std::optional<Ast::Type> t)
+	inline void refKind(const Ast::Collection& a)
+	{
+		child()->write(TypeRefSelector::Collection);
+		typeRef(*a.elementType);
+	}
+
+	inline void refKind(const std::string& n)
+	{
+		child()->write(TypeRefSelector::Alias);
+		child()->writeIdentifier(n);
+	}
+
+	inline void typeRef(const Ast::TypeRef &t) {
+		std::visit([this](const auto& t){refKind(t);}, t);
+	}
+
+	inline void retType(std::optional<Ast::TypeRef> t)
 	{
 		if(t.has_value())
 		{
-			type(t.value());
+			typeRef(t.value());
 		}
 		else
 		{
-			child()->write(TypeSelector::None);
+			child()->write(TypeRefSelector::None);
 		}
+	}
+
+	inline void defKind(const Ast::Primitive& a)
+	{
+		child()->write(TypeDefSelector::Primitive);
+		writePrimitive(a);
+	}
+
+	inline void defKind(const Ast::Collection& a)
+	{
+		child()->write(TypeDefSelector::Collection);
+		typeRef(*a.elementType);
+	}
+
+	inline void defKind(const Ast::Aggregate& a)
+	{
+		child()->write(TypeDefSelector::Aggregate);
+		varList(a.members);
+	}
+
+	inline void defKind(const std::string& n)
+	{
+		child()->write(TypeDefSelector::Alias);
+		child()->writeIdentifier(n);
+	}
+
+	inline void typeDef(const Ast::TypeDef &t) {
+		std::visit([this](const auto& t){defKind(t);}, t);
 	}
 
 	template<auto start = RootSelector::Func>
@@ -122,7 +149,7 @@ class AstSerializer: public AstSerDes
 	{
 		child()->write(RootSelector::Type);
 		child()->writeIdentifier(a.name);
-		type(a.type, a.name);
+		typeDef(a.type);
 	}
 
 	template<auto start = RootSelector::Func>
@@ -179,7 +206,7 @@ class AstDeserializer: public AstSerDes
 		return static_cast<Child*>(this);
 	}
 
-	std::map<std::string, Ast::Type> aliases;
+	std::map<std::string, Ast::TypeDef> aliases;
 
 	Ast::Primitive primitive()
 	{
@@ -199,11 +226,29 @@ class AstDeserializer: public AstSerDes
 		}
 	}
 
+	std::optional<Ast::TypeRef> typeRef()
+	{
+		TypeRefSelector kind;
+		child()->read(kind);
+
+		switch(kind)
+		{
+		case TypeRefSelector::Primitive:
+			return primitive();
+		case TypeRefSelector::Collection:
+			return collection();
+		case TypeRefSelector::Alias:
+			return aliasRef();
+		default:
+			return {};
+		}
+	}
+
 	Ast::Collection collection()
 	{
-		if(auto t = type())
+		if(auto t = typeRef())
 		{
-			return Ast::Collection{std::make_shared<Ast::Type>(*t)};
+			return Ast::Collection{std::make_shared<Ast::TypeRef>(*t)};
 		}
 		else
 		{
@@ -215,7 +260,7 @@ class AstDeserializer: public AstSerDes
 	{
 		std::vector<Ast::Var> ret;
 
-		while(auto t = this->type())
+		while(auto t = this->typeRef())
 		{
 			std::string name;
 			child()->readIdentifier(name);
@@ -233,54 +278,13 @@ class AstDeserializer: public AstSerDes
 		return Ast::Aggregate{varList()};
 	}
 
-	Ast::Type doType(TypeSelector kind, std::string name = "")
-	{
-		switch(kind)
-		{
-		case TypeSelector::Primitive:
-			return {name, primitive()};
-		case TypeSelector::Collection:
-			return {name, collection()};
-		case TypeSelector::Aggregate:
-			return {name, aggregate()};
-		default:
-			{
-				std::string key;
-				child()->readIdentifier(key);
-				if(auto it = aliases.find(key); it != aliases.end())
-				{
-					return it->second;
-				}
-				else
-				{
-					throw std::runtime_error("unknown type: '" + key + "'");
-				}
-			}
-		}
-	}
-
-	std::optional<Ast::Type> type(std::string name = "")
-	{
-		TypeSelector kind;
-		child()->read(kind);
-		return (kind == TypeSelector::None) ? std::nullopt : std::optional<Ast::Type>{doType(kind, name)};
-	}
-
 	Ast::Function func()
 	{
 		std::string name;
 		child()->readIdentifier(name);
-		auto ret = type();
+		auto ret = typeRef();
 		auto args = varList();
-
-		if(ret.has_value())
-		{
-			return Ast::Function({name, args}, ret.value());
-		}
-		else
-		{
-			return Ast::Function({name, args});
-		}
+		return Ast::Function({name, args}, ret);
 	}
 
 	Ast::Function action()
@@ -288,14 +292,45 @@ class AstDeserializer: public AstSerDes
 		std::string name;
 		child()->readIdentifier(name);
 		auto args = varList();
-		return Ast::Action{name, args};
+		return {Ast::Action{name, args}, {}};
+	}
+
+	std::string aliasRef()
+	{
+		std::string key;
+		child()->readIdentifier(key);
+
+		if(auto it = aliases.find(key); it == aliases.end())
+		{
+			throw std::runtime_error("unknown type: '" + key + "' encountered");
+		}
+
+		return key;
+	}
+
+	Ast::TypeDef typeDef()
+	{
+		TypeDefSelector kind;
+		child()->read(kind);
+
+		switch(kind)
+		{
+		case TypeDefSelector::Primitive:
+			return primitive();
+		case TypeDefSelector::Collection:
+			return collection();
+		case TypeDefSelector::Aggregate:
+			return aggregate();
+		default:
+			return aliasRef();
+		}
 	}
 
 	Ast::Alias alias()
 	{
 		std::string name;
 		child()->readIdentifier(name);
-		const auto t = *type(name);
+		const auto t = typeDef();
 		aliases.insert({name, t});
 		return Ast::Alias{name, t};
 	}

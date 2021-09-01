@@ -20,7 +20,7 @@ static inline std::string getColorFor(FormatOptions::Highlight kind)
 	switch(kind)
 	{
 	case FormatOptions::Highlight::Function:
-		return magenta;
+		return red;
 	case FormatOptions::Highlight::TypeDef:
 		return yellow;
 	case FormatOptions::Highlight::TypeRef:
@@ -32,7 +32,7 @@ static inline std::string getColorFor(FormatOptions::Highlight kind)
 	case FormatOptions::Highlight::Primitive:
 		return blue;
 	case FormatOptions::Highlight::Session:
-		return red;
+		return magenta;
 	default:
 		return resetColor;
 	}
@@ -68,7 +68,7 @@ inline std::string FormatOptions::formatNewlineIndentDelimit(const int n, const 
 	}
 }
 
-static inline std::string typeName(const FormatOptions& opts, const int n, const Ast::Type& t, std::string taboo={});
+static inline std::string typeRef(const FormatOptions& opts, const int n, const Ast::TypeRef& t);
 
 static inline std::string formatComent(const FormatOptions& opts, const int n, const std::string &text)
 {
@@ -92,7 +92,7 @@ static inline std::string formatComent(const FormatOptions& opts, const int n, c
 }
 
 static inline std::string memberItem(const FormatOptions& opts, const int n, const Ast::Var &v, FormatOptions::Highlight h) {
-	return formatComent(opts, n, v.docs) + opts.colorize(v.name, h) + ": "  + typeName(opts, n, v.type);
+	return formatComent(opts, n, v.docs) + opts.colorize(v.name, h) + ": "  + typeRef(opts, n, v.type);
 }
 
 template<class C, class F>
@@ -128,30 +128,35 @@ static inline std::string list(const FormatOptions& opts, const int n, const C &
 	return {};
 }
 
-static inline std::string typeKindToString(const FormatOptions& opts, const int n, const Ast::Primitive& p) {
+static inline std::string typeRefKindToString(const FormatOptions& opts, const int n, const Ast::Primitive& p) {
 	return opts.colorize(std::string(p.isSigned ? "i" : "u") + std::to_string(p.length), FormatOptions::Highlight::Primitive);
 }
 
-static inline std::string typeKindToString(const FormatOptions& opts, const int n, const Ast::Collection& c) {
-	return opts.formatNewlineIndentDelimit(n, typeName(opts, n + 1, *c.elementType), '[', ']');
+static inline std::string typeRefKindToString(const FormatOptions& opts, const int n, const Ast::Collection& c) {
+	return opts.formatNewlineIndentDelimit(n, typeRef(opts, n + 1, *c.elementType), '[', ']');
 }
 
-static inline std::string typeKindToString(const FormatOptions& opts, const int n, const Ast::Aggregate& c) {
+static inline std::string typeRefKindToString(const FormatOptions& opts, const int n, const std::string& p) {
+	return opts.colorize(p, FormatOptions::Highlight::TypeRef);
+}
+
+static inline std::string typeRef(const FormatOptions& opts, const int n, const Ast::TypeRef& t) {
+	return std::visit([n, &opts](const auto& x){ return typeRefKindToString(opts, n, x); }, t);
+}
+
+template<class C>
+static inline std::string typeDefKindToString(const FormatOptions& opts, const int n, const C& v) {
+	return typeRefKindToString(opts, n, v);
+}
+
+static inline std::string typeDefKindToString(const FormatOptions& opts, const int n, const Ast::Aggregate& c) {
 	return opts.formatNewlineIndentDelimit(n, list(opts, n + 1, c.members, [](const FormatOptions& opts, const int n, const Ast::Var& v){
 		return memberItem(opts, n, v, FormatOptions::Highlight::Member);}
 	), '{', '}');
 }
 
-static inline std::string typeName(const FormatOptions& opts, const int n, const Ast::Type& t, std::string forbiddenName)
-{
-	const auto trueType = std::visit([n, &opts](const auto& x){ return typeKindToString(opts, n, x); }, t.second);
-
-	if(t.first != forbiddenName)
-	{
-		return opts.colorize(t.first, FormatOptions::Highlight::TypeRef);
-	}
-
-	return trueType;
+static inline std::string typeDef(const FormatOptions& opts, const int n, const Ast::TypeDef& t) {
+	return std::visit([n, &opts](const auto& x){ return typeDefKindToString(opts, n, x); }, t);
 }
 
 static inline std::string argumentList(const FormatOptions& opts, const int n, const std::vector<Ast::Var> &args)
@@ -169,14 +174,15 @@ static inline std::string formatItem(const FormatOptions& opts, const int n, con
 	return opts.indent(n) + signature(opts, n, s) + ";";
 }
 
-static inline std::string formatItem(const FormatOptions& opts, const int n, const Ast::Function& s) {
-	return opts.indent(n) + signature(opts, n, s)
-			+ ((s.returnType.has_value()) ? (std::string(": ") + typeName(opts, n + 1, s.returnType.value())) : std::string{})
-			+ ";";
+static inline std::string formatItem(const FormatOptions& opts, const int n, const Ast::Function& s)
+{
+	return opts.indent(n)
+		+ signature(opts, n, s)
+		+ ((s.returnType.has_value()) ? (std::string(": ") + typeRef(opts, n + 1, s.returnType.value())) : std::string{}) + ";";
 }
 
 static inline std::string formatItem(const FormatOptions& opts, const int n, const Ast::Alias& s) {
-	return opts.indent(n) + opts.colorize(s.name, FormatOptions::Highlight::TypeDef) + " = " + typeName(opts, n + 1, s.type, s.name) + ";";
+	return opts.indent(n) + opts.colorize(s.name, FormatOptions::Highlight::TypeDef) + " = " + typeDef(opts, n + 1, s.type) + ";";
 }
 
 static inline std::string formatSessionItem(const FormatOptions& opts, const int n, const Ast::Session::ForwardCall& s) {

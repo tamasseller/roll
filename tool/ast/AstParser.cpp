@@ -10,7 +10,7 @@
 
 struct SemanticParser
 {
-	std::map<std::string, Ast::Type> aliases;
+	std::map<std::string, Ast::TypeDef> aliases;
 
 	static constexpr inline int getLength(char c)
 	{
@@ -59,7 +59,7 @@ struct SemanticParser
 	}
 
 	inline Ast::Var makeVar(rpcParser::VarContext* ctx) const {
-		return { ctx->name->getText(), resolveType(ctx->t), makeDocs(ctx->docs)};
+		return { ctx->name->getText(), resolveTypeRef(ctx->t), makeDocs(ctx->docs)};
 	}
 
 	template<class It> std::vector<Ast::Var> parseVarList(It begin, It end) const
@@ -77,55 +77,12 @@ struct SemanticParser
 	{
 		if(ctx->ret)
 		{
-			return Ast::Function(makeCall(ctx->call), resolveType(ctx->ret));
+			return Ast::Function(makeCall(ctx->call), resolveTypeRef(ctx->ret));
 		}
 		else
 		{
-			return Ast::Function(makeCall(ctx->call));
+			return Ast::Function(makeCall(ctx->call), {});
 		}
-	}
-
-	inline Ast::Session makeSession(rpcParser::SessionContext* ctx) const {
-		return Ast::Session{ctx->name->getText(), parseSession(ctx->items)};
-	}
-
-	inline Ast::Type resolveType(rpcParser::TypeContext* ctx, std::string name = "") const
-	{
-		if(auto data = ctx->p)
-		{
-			return {name, makePrimitive(data->kind->getText())};
-		}
-		else if(auto data = ctx->c)
-		{
-			return {name, Ast::Collection{std::make_shared<Ast::Type>(resolveType(data->elementType))}};
-		}
-		else if(auto data = ctx->a)
-		{
-			return {name, Ast::Aggregate{parseVarList(data->members->vars.begin(), data->members->vars.end())}};
-		}
-		else
-		{
-			const auto name = ctx->n->getText();
-
-			if(auto it = aliases.find(name); it != aliases.end())
-			{
-				return it->second;
-			}
-			else
-			{
-				throw std::runtime_error("No such type alias defined: " + name);
-			}
-		}
-
-		throw std::runtime_error("Internal error: unknown type kind");
-	}
-
-	inline Ast::Type addAlias(rpcParser::TypeAliasContext* ctx)
-	{
-		const auto name = ctx->name->getText();
-		auto ret = resolveType(ctx->value, name);
-		aliases.emplace(name, ret);
-		return ret;
 	}
 
 	inline std::vector<Ast::Session::Item> parseSession(std::vector<rpcParser::SessionItemContext *> items) const
@@ -152,6 +109,68 @@ struct SemanticParser
 		return ret;
 	}
 
+	inline Ast::Session makeSession(rpcParser::SessionContext* ctx) const {
+		return Ast::Session{ctx->name->getText(), parseSession(ctx->items)};
+	}
+
+	inline std::string checkAlias(const std::string& name) const
+	{
+		if(auto it = aliases.find(name); it == aliases.end())
+		{
+			throw std::runtime_error("No such type alias defined: " + name);
+		}
+
+		return name;
+	}
+
+	inline Ast::TypeRef resolveTypeRef(rpcParser::TyperefContext* ctx) const
+	{
+		if(auto data = ctx->p)
+		{
+			return makePrimitive(data->kind->getText());
+		}
+		else if(auto data = ctx->c)
+		{
+			return Ast::Collection{std::make_shared<Ast::TypeRef>(resolveTypeRef(data->elementType))};
+		}
+		else if(auto data = ctx->n)
+		{
+			return checkAlias(data->getText());
+		}
+
+		throw std::runtime_error("Internal error: unknown type kind in reference");
+	}
+
+	inline Ast::TypeDef addAlias(const std::string &name, Ast::TypeDef ret)
+	{
+		aliases.emplace(name, ret);
+		return ret;
+	}
+
+	inline Ast::TypeDef resolveTypeDef(rpcParser::TypeAliasContext* ctx)
+	{
+		const auto name = ctx->name->getText();
+
+		if(auto data = ctx->p)
+		{
+			return addAlias(name, makePrimitive(data->kind->getText()));
+		}
+		else if(auto data = ctx->c)
+		{
+			return addAlias(name, Ast::Collection{std::make_shared<Ast::TypeRef>(resolveTypeRef(data->elementType))});
+		}
+		else if(auto data = ctx->n)
+		{
+			return addAlias(name, checkAlias(data->getText()));
+		}
+		else if(auto data = ctx->a)
+		{
+			return addAlias(name, Ast::Aggregate{parseVarList(data->members->vars.begin(), data->members->vars.end())});
+		}
+
+		throw std::runtime_error("Internal error: unknown type kind in definition");
+	}
+
 	inline Ast::Item processItem(rpcParser::ItemContext* s)
 	{
 		if(auto d = s->func)
@@ -160,7 +179,7 @@ struct SemanticParser
 		}
 		else if(auto d = s->alias)
 		{
-			return {makeDocs(s->docs), Ast::Alias{d->name->getText(), addAlias(d)}};
+			return {makeDocs(s->docs), Ast::Alias{d->name->getText(), resolveTypeDef(d)}};
 		}
 		else
 		{

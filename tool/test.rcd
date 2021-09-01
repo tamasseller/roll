@@ -1,14 +1,27 @@
 string = [i1];
-ztring = string ;
+ztring = string;
+
+struct = 
+{
+	/* documentation comment */ 
+	str: string, 
+	/* at predefined locations */ id : u4 
+};
+
 /* this returns something */
-bar(elements :[{/* documentation comment */ str: string, /* at predefined locations */id : u4 }]): i4 ;
+bar(elements :[struct]): i4 ;
  /* this is foo */ foo(num: i4, name:[i1] );
 nop();
 set(v: i2);
 now(): u8;
 name(): [i1];
-ifs(): [{name:[i1] , id:i4 ,corr:u4}];
-stupid(s: {s:i1}): {e:[{c:[{a:i1}]}]}; 
+if = {name:[i1] , id:i4 ,corr:u4};
+ifs(): [if];
+s1 = {s:i1};
+s2 = {a:i1};
+s3 = {c:[s2]};
+s4 = {e:[s3]};
+stupid(s: s1): s4; 
 
 /* session */
 session < !echo(v:string); @echo(v:string)  >;
@@ -34,10 +47,11 @@ acquistion
 /* typedef */
 HostId = u4;
 NetifId = u4;
+HostInfo = {hostId: HostId, names: [string]};
 
 tdp
 <
-	start(queryId: u4): {hostId: HostId, names: [string]};
+	start(queryId: u4): HostInfo;
 	@onInterface(netifId: NetifId, ifNum: i4, names: [string]);
 	@onPeer(hostId: HostId, v:string)
 >;

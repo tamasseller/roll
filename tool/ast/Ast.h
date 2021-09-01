@@ -14,7 +14,8 @@ struct Ast
 	struct Aggregate; 	//< Structured data (like a struct)
 	struct Var; 		//< A named slot for a value of a predetermined type.
 
-	using Type = std::pair<std::string, std::variant<Primitive, Collection, Aggregate>>;
+	using TypeRef = std::variant<Primitive, Collection, std::string>;
+	using TypeDef = std::variant<Primitive, Collection, Aggregate, std::string>;
 
 	/// Single 1/2/4/8 byte signed/unsigned word (primitive integers).
 	struct Primitive
@@ -40,7 +41,7 @@ struct Ast
 	/// A heterogeneous list of named elements with fixed order (structure).
 	struct Collection
 	{
-		const std::shared_ptr<Type> elementType;
+		const std::shared_ptr<TypeRef> elementType;
 
 		inline bool operator==(const Collection& o) const {
 			return *elementType == *o.elementType;
@@ -51,10 +52,10 @@ struct Ast
 	struct Var
 	{
 		const std::string name;
-		const Type type;
+		const TypeRef type;
 		const std::string docs;
 
-		inline Var(const std::string &name, Type type, std::string docs): name(name), type(type), docs(docs) {}
+		inline Var(const std::string &name, TypeRef type, std::string docs): name(name), type(type), docs(docs) {}
 
 		inline bool operator==(const Var& o) const {
 			return name == o.name && type == o.type;
@@ -73,9 +74,8 @@ struct Ast
 
 	struct Function: Action
 	{
-		const std::optional<Type> returnType;
-		inline Function(Action call, Type returnType): Action(call), returnType(returnType) {}
-		inline Function(Action call): Action(call) {}
+		const std::optional<TypeRef> returnType;
+		inline Function(Action call, std::optional<TypeRef> returnType): Action(call), returnType(returnType) {}
 
 		inline bool operator==(const Function& o) const {
 			return *((Action*)this) == (const Action&)o;
@@ -84,9 +84,9 @@ struct Ast
 
 	struct Alias
 	{
-		const Type type;
+		const TypeDef type;
 		const std::string name;
-		inline Alias(const std::string &name, Type type): type(type), name(name) {}
+		inline Alias(const std::string &name, TypeDef type): type(type), name(name) {}
 
 		inline bool operator==(const Alias& o) const {
 			return type == o.type && name == o.name;

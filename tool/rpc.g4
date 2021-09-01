@@ -1,15 +1,15 @@
 grammar rpc;
 
 primitive:  kind=PRIMITIVE;
-collection: '[' WS* elementType=type WS* ']';
-aggregate:  '{' members=varList '}';
-type: p=primitive | a=aggregate | c=collection | n=IDENTIFIER;
-var: WS* (docs=DOCS)? WS* name=IDENTIFIER VALSEP t=type  WS*;
+collection: '[' WS* elementType=typeref WS* ']';
+typeref: p=primitive | c=collection | n=IDENTIFIER;
+var: WS* (docs=DOCS)? WS* name=IDENTIFIER VALSEP t=typeref  WS*;
 varList: WS* vars+=var? (LISTSEP vars+=var)* WS* ;
 action: name=IDENTIFIER WS* '(' args=varList ')';
-function: call=action (VALSEP ret=type)?;
+function: call=action (VALSEP ret=typeref)?;
 
-typeAlias: name=IDENTIFIER NAMEVALSEP value=type;
+aggregate:  '{' members=varList '}';
+typeAlias: name=IDENTIFIER NAMEVALSEP (p=primitive | a=aggregate | c=collection | n=IDENTIFIER);
 
 fwdCall: '!' WS* sym=action;
 callBack: '@' WS* sym=action;
