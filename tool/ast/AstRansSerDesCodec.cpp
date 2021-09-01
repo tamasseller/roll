@@ -12,8 +12,10 @@ static StaticConstantRansModel<char(8)> primitiveSelectorModel;
 static StaticConstantRansModel<char(4)> sessionItemSelectorModel;
 static StaticConstantRansModel<char(53)> intialIdCharModel;
 static StaticConstantRansModel<char(64)> nonIntialIdCharModel;
+static StaticConstantRansModel<char(98)> textCharModel;
 
-static inline char initialCharToIndex(char c)
+
+static inline char idInitialCharToIndex(char c)
 {
 	if(c == '_')
 		return 0;
@@ -25,7 +27,7 @@ static inline char initialCharToIndex(char c)
 		throw std::runtime_error("Unexpected character in identifier: '" + std::string(1, c) + "'");
 }
 
-static inline char initialIndexToChar(char x)
+static inline char idInitialIndexToChar(char x)
 {
 	if(x == 0)
 		return '_';
@@ -37,7 +39,7 @@ static inline char initialIndexToChar(char x)
 		throw std::runtime_error("Unexpected index in identifier: " + std::to_string((int)x));
 }
 
-char nonInitialCharToIndex(char c)
+char idNonInitialCharToIndex(char c)
 {
 	if(c == '_')
 		return 0;
@@ -53,7 +55,7 @@ char nonInitialCharToIndex(char c)
 		throw std::runtime_error("Unexpected character in identifier: '" + std::string(1, c) + "'");
 }
 
-static inline char nonInitialIndexToChar(char x)
+static inline char idNonInitialIndexToChar(char x)
 {
 	if(x == 0)
 		return '_';
@@ -67,6 +69,40 @@ static inline char nonInitialIndexToChar(char x)
 		return 0;
 	else
 		throw std::runtime_error("Unexpected index in identifier: " + std::to_string((int)x));
+}
+
+char textCharToIndex(char c)
+{
+	if(c == 0)
+		return 0;
+	else if(c == '\n')
+		return 1;
+	else if(c == '\t')
+		return 2;
+	else if(' ' <= c && c <= '~')
+		return c - ' ' + 3;
+	else
+		throw std::runtime_error("Unexpected character in identifier: '" + std::string(1, c) + "'");
+}
+
+static inline char textIndexToChar(char x)
+{
+	switch(x)
+	{
+	case 0: return 0;
+	case 1: return '\n';
+	case 2: return '\t';
+	default:
+		if(x <= '~' - ' ' + 3)
+		{
+			return x - 3 + ' ';
+		}
+		else
+		{
+			throw std::runtime_error("Unexpected index in identifier: " + std::to_string((int)x));
+		}
+	}
+
 }
 
 struct RansSink: AstSerializer<RansSink>
@@ -103,22 +139,36 @@ struct RansSink: AstSerializer<RansSink>
 		});
 	}
 
-	inline void write(std::string v)
+	inline void writeIdentifier(std::string v)
 	{
 		wcTotalStringOverhead += v.length() - 1;
 
 		items.push_back([v{std::move(v)}](RansEncoder & enc)
 		{
 			auto it = v.end();
-			enc.put(nonIntialIdCharModel, nonInitialCharToIndex('\0'));
+			enc.put(nonIntialIdCharModel, idNonInitialCharToIndex('\0'));
 
 			for(--it; it != v.begin(); --it)
-				enc.put(nonIntialIdCharModel, nonInitialCharToIndex(*it));
+				enc.put(nonIntialIdCharModel, idNonInitialCharToIndex(*it));
 
-			enc.put(intialIdCharModel, initialCharToIndex(*it));
+			enc.put(intialIdCharModel, idInitialCharToIndex(*it));
 		});
 	}
 
+	inline void writeText(std::string v)
+	{
+		wcTotalStringOverhead += v.length() - 1;
+
+		items.push_back([v{std::move(v)}](RansEncoder & enc)
+		{
+			enc.put(textCharModel, textCharToIndex('\0'));
+
+			for(int i = v.length() - 1; i >= 0; i--)
+			{
+				enc.put(textCharModel, textCharToIndex(v[i]));
+			}
+		});
+	}
 	inline std::string result()
 	{
 		RansEncoder enc(100 *(items.size() + wcTotalStringOverhead));
@@ -153,13 +203,25 @@ struct RansSource: AstDeserializer<RansSource>, RansDecoder
 		v = (SessionItemSelector)this->get(sessionItemSelectorModel);
 	}
 
-	inline void read(std::string &v)
+	inline void readIdentifier(std::string &v)
 	{
 		std::stringstream ss;
 
-		ss << initialIndexToChar(this->get(intialIdCharModel));
+		ss << idInitialIndexToChar(this->get(intialIdCharModel));
 
-		while(char c = nonInitialIndexToChar(this->get(nonIntialIdCharModel)))
+		while(char c = idNonInitialIndexToChar(this->get(nonIntialIdCharModel)))
+		{
+			ss << c;
+		}
+
+		v = ss.str();
+	}
+
+	inline void readText(std::string &v)
+	{
+		std::stringstream ss;
+
+		while(char c = textIndexToChar(this->get(textCharModel)))
 		{
 			ss << c;
 		}
@@ -183,8 +245,8 @@ void selftest()
 
 	for(char c: initialChars)
 	{
-		const auto idx = initialCharToIndex(c);
-		assert(c == initialIndexToChar(idx));
+		const auto idx = idInitialCharToIndex(c);
+		assert(c == idInitialIndexToChar(idx));
 		const auto range = intialIdCharModel.predict(idx);
 
 		char r, s, t;
@@ -207,14 +269,39 @@ void selftest()
 
 	for(char c: nonInitialChars)
 	{
-		const auto idx = nonInitialCharToIndex(c);
-		assert(c == nonInitialIndexToChar(idx));
+		const auto idx = idNonInitialCharToIndex(c);
+		assert(c == idNonInitialIndexToChar(idx));
 		const auto range = nonIntialIdCharModel.predict(idx);
 
 		char r, s, t;
 		nonIntialIdCharModel.identify(range.cummulated, r);
 		nonIntialIdCharModel.identify(range.cummulated + range.width / 2, s);
 		nonIntialIdCharModel.identify(range.cummulated + range.width - 1, t);
+		assert(r == idx && s == idx && t == idx);
+	}
+
+	static constexpr const char textChars[] =
+	{
+		'\0', '\t', '\n', ' ', '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-',
+		'.', '/', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?',
+		'@', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
+		'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '[', '\\', ']', '^', '_', '`', 'a', 'b', 'c',
+		'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u',
+		'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~'
+	};
+
+	static_assert(sizeof(textChars) / sizeof(textChars[0]) == 98);
+
+	for(char c: textChars)
+	{
+		const auto idx = textCharToIndex(c);
+		assert(c == textIndexToChar(idx));
+		const auto range = textCharModel.predict(idx);
+
+		char r, s, t;
+		textCharModel.identify(range.cummulated, r);
+		textCharModel.identify(range.cummulated + range.width / 2, s);
+		textCharModel.identify(range.cummulated + range.width - 1, t);
 		assert(r == idx && s == idx && t == idx);
 	}
 

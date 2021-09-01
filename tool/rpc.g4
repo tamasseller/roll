@@ -4,7 +4,7 @@ primitive:  kind=PRIMITIVE;
 collection: '[' WS* elementType=type WS* ']';
 aggregate:  '{' members=varList '}';
 type: p=primitive | a=aggregate | c=collection | n=IDENTIFIER;
-var: WS* name=IDENTIFIER VALSEP t=type WS* (docs=DOCS)? WS*;
+var: WS* (docs=DOCS)? WS* name=IDENTIFIER VALSEP t=type  WS*;
 varList: WS* vars+=var? (LISTSEP vars+=var)* WS* ;
 action: name=IDENTIFIER WS* '(' args=varList ')';
 function: call=action (VALSEP ret=type)?;
@@ -13,10 +13,10 @@ typeAlias: name=IDENTIFIER NAMEVALSEP value=type;
 
 fwdCall: '!' WS* sym=action;
 callBack: '@' WS* sym=action;
-sessionItem: (fwd=fwdCall | bwd=callBack | ctr=function) WS* (docs=DOCS)? WS* ;
+sessionItem: WS* (docs=DOCS)? WS* (fwd=fwdCall | bwd=callBack | ctr=function) WS* ;
 session: name=IDENTIFIER WS* '<' WS* items+=sessionItem (DECLSEP+ (items+=sessionItem)? WS*)*? '>';
 
-item: WS* (func=function | alias=typeAlias | sess=session) WS* (docs=DOCS)? WS*;
+item: WS* (docs=DOCS)? WS* (func=function | alias=typeAlias | sess=session) WS*;
 
 rpc: items+=item (DECLSEP+ (items+=item | EOF))*;
  

@@ -70,8 +70,29 @@ inline std::string FormatOptions::formatNewlineIndentDelimit(const int n, const 
 
 static inline std::string typeName(const FormatOptions& opts, const int n, const Ast::Type& t, std::string taboo={});
 
+static inline std::string formatComent(const FormatOptions& opts, const int n, const std::string &text)
+{
+	std::stringstream ss;
+
+	if(text.length())
+	{
+		ss << "/* " << text << " */";
+
+		if(opts.pretty)
+		{
+			ss << "\n" << opts.indent(n);
+		}
+		else
+		{
+			ss << " ";
+		}
+	}
+
+	return ss.str();
+}
+
 static inline std::string memberItem(const FormatOptions& opts, const int n, const Ast::Var &v, FormatOptions::Highlight h) {
-	return opts.colorize(v.name, h) + ": " + typeName(opts, n, v.type);
+	return formatComent(opts, n, v.docs) + opts.colorize(v.name, h) + ": "  + typeName(opts, n, v.type);
 }
 
 template<class C, class F>
@@ -127,7 +148,7 @@ static inline std::string typeName(const FormatOptions& opts, const int n, const
 
 	if(t.first != forbiddenName)
 	{
-		return opts.colorize(t.first, FormatOptions::Highlight::TypeRef) + (opts.pretty ? (std::string(" /* ") + trueType + " */") : std::string{});
+		return opts.colorize(t.first, FormatOptions::Highlight::TypeRef);
 	}
 
 	return trueType;
@@ -175,7 +196,8 @@ static inline std::string formatItem(const FormatOptions& opts, const int n, con
 	return opts.indent(n) + opts.colorize(s.name, FormatOptions::Highlight::Session)
 			+ "\n" + opts.indent(n) + "<\n"
 			+ std::accumulate(s.items.begin(), s.items.end(), std::string{}, [n, &opts](const std::string a, const auto &i){
-				return a + opts.indent(n + 1) + std::visit([&opts, n](auto& v) {return formatSessionItem(opts, n + 1, v);}, i) + ";\n";
+				return a + opts.indent(n + 1) + formatComent(opts, n + 1, i.first)
+						+ std::visit([&opts, n](auto& v) {return formatSessionItem(opts, n + 1, v);}, i.second) + ";\n";
 			})
 			+ opts.indent(n) + ">;";
 }
@@ -186,7 +208,7 @@ std::string format(const FormatOptions& opts, const Ast& ast)
 
 	std::transform(ast.items.begin(), ast.items.end(), std::ostream_iterator<std::string>(ss, "\n"), [&opts](const auto& s)
 	{
-		return std::visit([&opts](const auto &s){return formatItem(opts, 0, s); }, s);
+		return formatComent(opts, 0, s.first) + std::visit([&opts](const auto &s){return formatItem(opts, 0, s); }, s.second);
 	});
 
 	return ss.str();

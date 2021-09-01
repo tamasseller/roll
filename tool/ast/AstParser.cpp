@@ -6,6 +6,7 @@
 
 #include <map>
 #include <algorithm>
+#include <cassert>
 
 struct SemanticParser
 {
@@ -27,8 +28,38 @@ struct SemanticParser
 		return {str[0] == 'i' || str[0] == 'I', getLength(str[1])};
 	}
 
+
+	inline std::string makeDocs(antlr4::Token *t) const
+	{
+		if(t)
+		{
+			std::string ws = " \t\r\n";
+			const std::string full = t->getText();
+			assert(full.length() >= 4);
+
+			size_t first = 0, last = 0;
+			for(size_t idx = 2; idx < full.length() - 2; idx++)
+			{
+				if(ws.find(full[idx]) == std::string::npos)
+				{
+					if(!first)
+						first = idx;
+
+					last = idx;
+				}
+			}
+
+			if(first)
+			{
+				return full.substr(first, last - first + 1);
+			}
+		}
+
+		return {};
+	}
+
 	inline Ast::Var makeVar(rpcParser::VarContext* ctx) const {
-		return { ctx->name->getText(), resolveType(ctx->t)};
+		return { ctx->name->getText(), resolveType(ctx->t), makeDocs(ctx->docs)};
 	}
 
 	template<class It> std::vector<Ast::Var> parseVarList(It begin, It end) const
@@ -104,15 +135,15 @@ struct SemanticParser
 		{
 			if(auto d = i->fwd)
 			{
-				return Ast::Session::ForwardCall(makeCall(d->sym));
+				return {makeDocs(i->docs), Ast::Session::ForwardCall(makeCall(d->sym))};
 			}
 			else if(auto d = i->bwd)
 			{
-				return Ast::Session::CallBack(makeCall(d->sym));
+				return {makeDocs(i->docs), Ast::Session::CallBack(makeCall(d->sym))};
 			}
 			else if(auto d = i->ctr)
 			{
-				return Ast::Session::CallBack(makeFunc(d));
+				return {makeDocs(i->docs), Ast::Session::CallBack(makeFunc(d))};
 			}
 
 			throw std::runtime_error("Internal error: unknown session item kind");
@@ -125,15 +156,15 @@ struct SemanticParser
 	{
 		if(auto d = s->func)
 		{
-			return makeFunc(d);
+			return {makeDocs(s->docs), makeFunc(d)};
 		}
 		else if(auto d = s->alias)
 		{
-			return Ast::Alias{d->name->getText(), addAlias(d)};
+			return {makeDocs(s->docs), Ast::Alias{d->name->getText(), addAlias(d)}};
 		}
 		else
 		{
-			return makeSession(s->sess);
+			return {makeDocs(s->docs), makeSession(s->sess)};
 		}
 	}
 

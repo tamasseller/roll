@@ -25,7 +25,7 @@ CLI_APP(dump, "parse and dump descriptor in textual format")
 		}
 		else if(opts.colored && !isatty(fileno(stdout)))
 		{
-		   std::cerr << "Output is not a terminal, disabling coloring. Note: the -o option is available to save output to file." << std::endl;
+		   std::cerr << "Warning: the output is not a terminal, disabling coloring (the -o option allows saving the output to a file directly)." << std::endl;
 		   opts.colored = false;
 		}
 

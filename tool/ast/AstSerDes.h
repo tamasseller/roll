@@ -37,7 +37,8 @@ class AstSerializer: public AstSerDes
 		for(const auto &i: items)
 		{
 			type(i.type);
-			child()->write(i.name);
+			child()->writeIdentifier(i.name);
+			child()->writeText(i.docs);
 		}
 
 		child()->write(TypeSelector::None);
@@ -88,7 +89,7 @@ class AstSerializer: public AstSerDes
 		if(t.first != forbiddenName)
 		{
 			child()->write(TypeSelector::Alias);
-			child()->write(t.first);
+			child()->writeIdentifier(t.first);
 		}
 		else
 		{
@@ -112,7 +113,7 @@ class AstSerializer: public AstSerDes
 	inline void processItem(const Ast::Function& f)
 	{
 		child()->write(start);
-		child()->write(f.name);
+		child()->writeIdentifier(f.name);
 		retType(f.returnType);
 		varList(f.args);
 	}
@@ -120,7 +121,7 @@ class AstSerializer: public AstSerDes
 	inline void processItem(const Ast::Alias& a)
 	{
 		child()->write(RootSelector::Type);
-		child()->write(a.name);
+		child()->writeIdentifier(a.name);
 		type(a.type, a.name);
 	}
 
@@ -128,7 +129,7 @@ class AstSerializer: public AstSerDes
 	inline void processAction(const Ast::Action& a)
 	{
 		child()->write(start);
-		child()->write(a.name);
+		child()->writeIdentifier(a.name);
 		varList(a.args);
 	}
 
@@ -147,11 +148,12 @@ class AstSerializer: public AstSerDes
 	inline void processItem(const Ast::Session& sess)
 	{
 		child()->write(RootSelector::Session);
-		child()->write(sess.name);
+		child()->writeIdentifier(sess.name);
 
 		for(const auto& i: sess.items)
 		{
-			std::visit([this](const auto &i){return processSessionItem(i); }, i);
+			std::visit([this](const auto &i){return processSessionItem(i); }, i.second);
+			child()->writeText(i.first);
 		}
 
 		child()->write(SessionItemSelector::None);
@@ -162,7 +164,8 @@ public:
 	{
 		for(const auto& i: ast.items)
 		{
-			std::visit([this](const auto &i){return processItem(i); }, i);
+			std::visit([this](const auto &i){return processItem(i); }, i.second);
+			child()->writeText(i.first);
 		}
 
 		child()->write(RootSelector::None);
@@ -215,8 +218,12 @@ class AstDeserializer: public AstSerDes
 		while(auto t = this->type())
 		{
 			std::string name;
-			child()->read(name);
-			ret.emplace_back(name, *t);
+			child()->readIdentifier(name);
+
+			std::string docs;
+			child()->readText(docs);
+
+			ret.emplace_back(name, *t, docs);
 		}
 
 		return ret;
@@ -239,7 +246,7 @@ class AstDeserializer: public AstSerDes
 		default:
 			{
 				std::string key;
-				child()->read(key);
+				child()->readIdentifier(key);
 				if(auto it = aliases.find(key); it != aliases.end())
 				{
 					return it->second;
@@ -262,7 +269,7 @@ class AstDeserializer: public AstSerDes
 	Ast::Function func()
 	{
 		std::string name;
-		child()->read(name);
+		child()->readIdentifier(name);
 		auto ret = type();
 		auto args = varList();
 
@@ -279,7 +286,7 @@ class AstDeserializer: public AstSerDes
 	Ast::Function action()
 	{
 		std::string name;
-		child()->read(name);
+		child()->readIdentifier(name);
 		auto args = varList();
 		return Ast::Action{name, args};
 	}
@@ -287,21 +294,28 @@ class AstDeserializer: public AstSerDes
 	Ast::Alias alias()
 	{
 		std::string name;
-		child()->read(name);
+		child()->readIdentifier(name);
 		const auto t = *type(name);
 		aliases.insert({name, t});
 		return Ast::Alias{name, t};
 	}
 
+	template<class R>
+	R readTheDocs(decltype(std::declval<R>().second) content)
+	{
+		std::string docs;
+		child()->readText(docs);
+		return {docs, content};
+	}
+
 	Ast::Session session()
 	{
 		std::string name;
-		child()->read(name);
+		child()->readIdentifier(name);
 
 		std::vector<Ast::Session::Item> items;
 
-		bool done = false;
-		while(!done)
+		while(true)
 		{
 			SessionItemSelector s;
 			child()->read(s);
@@ -309,20 +323,18 @@ class AstDeserializer: public AstSerDes
 			switch(s)
 			{
 			case SessionItemSelector::ForwardCall:
-				items.push_back(Ast::Session::ForwardCall(action()));
+				items.push_back(readTheDocs<Ast::Session::Item>(Ast::Session::ForwardCall(action())));
 				break;
 			case SessionItemSelector::CallBack:
-				items.push_back(Ast::Session::CallBack(action()));
+				items.push_back(readTheDocs<Ast::Session::Item>(Ast::Session::CallBack(action())));
 				break;
 			case SessionItemSelector::Constructor:
-				items.push_back(Ast::Session::Ctor(func()));
+				items.push_back(readTheDocs<Ast::Session::Item>(Ast::Session::Ctor(func())));
 				break;
 			default:
-				done = true;
+				return {name, std::move(items)};
 			}
 		}
-
-		return {name, std::move(items)};
 	}
 
 public:
@@ -330,8 +342,7 @@ public:
 	{
 		std::vector<Ast::Item> items;
 
-		bool done = false;
-		while(!done)
+		while(true)
 		{
 			RootSelector s;
 			child()->read(s);
@@ -339,20 +350,18 @@ public:
 			switch(s)
 			{
 			case RootSelector::Func:
-				items.push_back(func());
+				items.push_back(readTheDocs<Ast::Item>(func()));
 				break;
 			case RootSelector::Type:
-				items.push_back(alias());
+				items.push_back(readTheDocs<Ast::Item>(alias()));
 				break;
 			case RootSelector::Session:
-				items.push_back(session());
+				items.push_back(readTheDocs<Ast::Item>(session()));
 				break;
 			default:
-				done = true;
+				return {std::move(items)};
 			}
 		}
-
-		return {std::move(items)};
 	}
 };
 

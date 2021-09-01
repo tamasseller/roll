@@ -1,7 +1,8 @@
-string = [i1] /* can this be a comment? */;
+string = [i1];
 ztring = string ;
-bar(elements :[{str: string /* documentation comment */, id : u4 /* at predefined locations */}]): i4 /* this returns something */;
-foo(num: i4, name:[i1] ) /* this is foo */;
+/* this returns something */
+bar(elements :[{/* documentation comment */ str: string, /* at predefined locations */id : u4 }]): i4 ;
+ /* this is foo */ foo(num: i4, name:[i1] );
 nop();
 set(v: i2);
 now(): u8;
@@ -9,21 +10,28 @@ name(): [i1];
 ifs(): [{name:[i1] , id:i4 ,corr:u4}];
 stupid(s: {s:i1}): {e:[{c:[{a:i1}]}]}; 
 
+/* session */
 session < !echo(v:string); @echo(v:string)  >;
 
+/* function */ 
 getChannels(): [string];
 
 acquistion 
 <
+	/* ctor */
 	start(channel: string);
 	
+	/* forward call */
 	!set(property: string, value: string);
 	!get(property: string);
+	
+	/* callback */
 	@onPropertyValue(property: string, value: string);
 	
 	@onData(data:[u1]);
 >;
 
+/* typedef */
 HostId = u4;
 NetifId = u4;
 

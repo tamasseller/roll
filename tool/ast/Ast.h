@@ -52,8 +52,9 @@ struct Ast
 	{
 		const std::string name;
 		const Type type;
+		const std::string docs;
 
-		inline Var(const std::string &name, Type type): name(name), type(type) {}
+		inline Var(const std::string &name, Type type, std::string docs): name(name), type(type), docs(docs) {}
 
 		inline bool operator==(const Var& o) const {
 			return name == o.name && type == o.type;
@@ -98,7 +99,7 @@ struct Ast
 		struct CallBack: Action { inline CallBack(Action c): Action(c) {} };
 		struct Ctor: Function { inline Ctor(Function f): Function(f) {} };
 
-		using Item = std::variant<ForwardCall, CallBack, Ctor>;
+		using Item = std::pair<std::string, std::variant<ForwardCall, CallBack, Ctor>>;
 
 		const std::string name;
 		const std::vector<Item> items;
@@ -108,7 +109,7 @@ struct Ast
 		}
 	};
 
-	using Item = std::variant<Function, Alias, Session>;
+	using Item = std::pair<std::string, std::variant<Function, Alias, Session>>;
 	const std::vector<Item> items;
 
 	inline bool operator==(const Ast& o) const {
