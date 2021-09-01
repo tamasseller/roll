@@ -6,10 +6,14 @@ OBJDIR = .o
 SOURCES += main.cpp
 SOURCES += Dump.cpp
 SOURCES += Serialize.cpp
+SOURCES += CodeGen.cpp
 
 SOURCES += ast/AstParser.cpp
 SOURCES += ast/AstFormatter.cpp
 SOURCES += ast/AstRansSerDesCodec.cpp
+
+SOURCES += gen/Generator.cpp
+SOURCES += gen/Cpp.cpp
 
 GENDIR = .gen
 CLEAN_EXTRA += $(GENDIR)

@@ -7,11 +7,11 @@
 
 #include <unistd.h>
 
-struct Options: InputOptions, OutputOptions, FormatOptions {};
+struct DumpOptions: InputOptions, OutputOptions, FormatOptions {};
 
-CLI_APP(dump, "parse and dump descriptor in textual format")
+CLI_APP(dump, "Dump descriptor in textual format")
 {
-	Options opts;
+	DumpOptions opts;
 
 	opts.InputOptions::add(this);
 	opts.OutputOptions::add(this);

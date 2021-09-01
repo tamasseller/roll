@@ -7,11 +7,11 @@
 
 #include <sstream>
 
-struct Options: InputOptions, OutputOptions {};
+struct SerializeOptions: InputOptions, OutputOptions {};
 
-CLI_APP(serialize, "parse and convert descriptor to dense binary format")
+CLI_APP(serialize, "Convert descriptor to dense binary format")
 {
-	Options opts;
+	SerializeOptions opts;
 
 	opts.InputOptions::add(this);
 	opts.OutputOptions::add(this);
