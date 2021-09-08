@@ -1,9 +1,9 @@
 #ifndef RPC_TOOL_ASTPARSER_H_
 #define RPC_TOOL_ASTPARSER_H_
 
-#include "Ast.h"
+#include "Contract.h"
 #include <iosfwd>
 
-Ast parse(std::istream& is);
+std::vector<Contract> parse(std::istream& is);
 
 #endif /* RPC_TOOL_ASTPARSER_H_ */

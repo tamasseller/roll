@@ -1,4 +1,4 @@
-#include "ast/AstParser.h"
+#include "ast/ContractParser.h"
 #include "gen/Generator.h"
 
 #include "InputOptions.h"

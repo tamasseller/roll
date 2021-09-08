@@ -1,11 +1,11 @@
 #ifndef RPC_TOOL_ASTRANSMODEL_H_
 #define RPC_TOOL_ASTRANSMODEL_H_
 
-#include "Ast.h"
+#include "Contract.h"
 #include <iosfwd>
 #include <string>
 
-Ast deserialize(std::istream &input);
-std::string serialize(const Ast& ast);
+std::vector<Contract> deserialize(std::istream &input);
+std::string serialize(const std::vector<Contract>& ast);
 
 #endif /* RPC_TOOL_ASTRANSMODEL_H_ */

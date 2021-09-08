@@ -2,12 +2,12 @@
 
 const CodeGenCpp CodeGenCpp::instance;
 
-std::string CodeGenCpp::generateClient(const Ast&) const
+std::string CodeGenCpp::generateClient(const Contract&) const
 {
 	return "c++ client";
 }
 
-std::string CodeGenCpp::generateServer(const Ast&) const
+std::string CodeGenCpp::generateServer(const Contract&) const
 {
 	return "c++ server";
 }

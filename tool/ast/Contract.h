@@ -7,7 +7,7 @@
 #include <variant>
 #include <optional>
 
-struct Ast
+struct Contract
 {
 	struct Primitive;  	//< Primitive integers (like char/short/int/long).
 	struct Collection; 	//< Variably sized array (like std::vector).
@@ -111,8 +111,9 @@ struct Ast
 
 	using Item = std::pair<std::string, std::variant<Function, Alias, Session>>;
 	const std::vector<Item> items;
+	const std::string name, docs;
 
-	inline bool operator==(const Ast& o) const {
+	inline bool operator==(const Contract& o) const {
 		return items == o.items;
 	}
 };

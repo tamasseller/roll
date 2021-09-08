@@ -1,12 +1,12 @@
 #ifndef RPC_TOOL_ASTSERDES_H_
 #define RPC_TOOL_ASTSERDES_H_
 
-#include "Ast.h"
+#include "Contract.h"
 
 #include <map>
 #include <sstream>
 
-struct AstSerDes
+struct ContractSerDes
 {
 	enum class RootSelector {
 		Func, Type, Session, None
@@ -30,13 +30,13 @@ struct AstSerDes
 };
 
 template<class Child>
-class AstSerializer: public AstSerDes
+class ContractSerializer: public ContractSerDes
 {
 	constexpr inline Child* child() {
 		return static_cast<Child*>(this);
 	}
 
-	inline void varList(const std::vector<Ast::Var> &items)
+	inline void varList(const std::vector<Contract::Var> &items)
 	{
 		for(const auto &i: items)
 		{
@@ -48,7 +48,7 @@ class AstSerializer: public AstSerDes
 		child()->write(TypeRefSelector::None);
 	}
 
-	inline void writePrimitive(const Ast::Primitive& a)
+	inline void writePrimitive(const Contract::Primitive& a)
 	{
 		if(a.isSigned)
 		{
@@ -74,13 +74,13 @@ class AstSerializer: public AstSerDes
 		}
 	}
 
-	inline void refKind(const Ast::Primitive& a)
+	inline void refKind(const Contract::Primitive& a)
 	{
 		child()->write(TypeRefSelector::Primitive);
 		writePrimitive(a);
 	}
 
-	inline void refKind(const Ast::Collection& a)
+	inline void refKind(const Contract::Collection& a)
 	{
 		child()->write(TypeRefSelector::Collection);
 		typeRef(*a.elementType);
@@ -92,11 +92,11 @@ class AstSerializer: public AstSerDes
 		child()->writeIdentifier(n);
 	}
 
-	inline void typeRef(const Ast::TypeRef &t) {
+	inline void typeRef(const Contract::TypeRef &t) {
 		std::visit([this](const auto& t){refKind(t);}, t);
 	}
 
-	inline void retType(std::optional<Ast::TypeRef> t)
+	inline void retType(std::optional<Contract::TypeRef> t)
 	{
 		if(t.has_value())
 		{
@@ -108,19 +108,19 @@ class AstSerializer: public AstSerDes
 		}
 	}
 
-	inline void defKind(const Ast::Primitive& a)
+	inline void defKind(const Contract::Primitive& a)
 	{
 		child()->write(TypeDefSelector::Primitive);
 		writePrimitive(a);
 	}
 
-	inline void defKind(const Ast::Collection& a)
+	inline void defKind(const Contract::Collection& a)
 	{
 		child()->write(TypeDefSelector::Collection);
 		typeRef(*a.elementType);
 	}
 
-	inline void defKind(const Ast::Aggregate& a)
+	inline void defKind(const Contract::Aggregate& a)
 	{
 		child()->write(TypeDefSelector::Aggregate);
 		varList(a.members);
@@ -132,12 +132,12 @@ class AstSerializer: public AstSerDes
 		child()->writeIdentifier(n);
 	}
 
-	inline void typeDef(const Ast::TypeDef &t) {
+	inline void typeDef(const Contract::TypeDef &t) {
 		std::visit([this](const auto& t){defKind(t);}, t);
 	}
 
 	template<auto start = RootSelector::Func>
-	inline void processItem(const Ast::Function& f)
+	inline void processItem(const Contract::Function& f)
 	{
 		child()->write(start);
 		child()->writeIdentifier(f.name);
@@ -145,7 +145,7 @@ class AstSerializer: public AstSerDes
 		varList(f.args);
 	}
 
-	inline void processItem(const Ast::Alias& a)
+	inline void processItem(const Contract::Alias& a)
 	{
 		child()->write(RootSelector::Type);
 		child()->writeIdentifier(a.name);
@@ -153,26 +153,26 @@ class AstSerializer: public AstSerDes
 	}
 
 	template<auto start = RootSelector::Func>
-	inline void processAction(const Ast::Action& a)
+	inline void processAction(const Contract::Action& a)
 	{
 		child()->write(start);
 		child()->writeIdentifier(a.name);
 		varList(a.args);
 	}
 
-	inline void processSessionItem(const Ast::Session::ForwardCall& a) {
-		processAction<SessionItemSelector::ForwardCall>((Ast::Action&)a);
+	inline void processSessionItem(const Contract::Session::ForwardCall& a) {
+		processAction<SessionItemSelector::ForwardCall>((Contract::Action&)a);
 	}
 
-	inline void processSessionItem(const Ast::Session::CallBack& a) {
-		processAction<SessionItemSelector::CallBack>((Ast::Action&)a);
+	inline void processSessionItem(const Contract::Session::CallBack& a) {
+		processAction<SessionItemSelector::CallBack>((Contract::Action&)a);
 	}
 
-	inline void processSessionItem(const Ast::Session::Ctor& f) {
-		processItem<SessionItemSelector::Constructor>((Ast::Function&)f);
+	inline void processSessionItem(const Contract::Session::Ctor& f) {
+		processItem<SessionItemSelector::Constructor>((Contract::Function&)f);
 	}
 
-	inline void processItem(const Ast::Session& sess)
+	inline void processItem(const Contract::Session& sess)
 	{
 		child()->write(RootSelector::Session);
 		child()->writeIdentifier(sess.name);
@@ -187,12 +187,24 @@ class AstSerializer: public AstSerDes
 	}
 
 public:
-	void traverse(const Ast &ast)
+	void traverse(const std::vector<Contract>& contracts)
 	{
-		for(const auto& i: ast.items)
+		for(const auto& c: contracts)
 		{
-			std::visit([this](const auto &i){return processItem(i); }, i.second);
-			child()->writeText(i.first);
+			if(!c.items.size())
+			{
+				continue;
+			}
+
+			for(const auto& i: c.items)
+			{
+				std::visit([this](const auto &i){return processItem(i); }, i.second);
+				child()->writeText(i.first);
+			}
+
+			child()->write(RootSelector::None);
+			child()->writeIdentifier(c.name);
+			child()->writeText(c.docs);
 		}
 
 		child()->write(RootSelector::None);
@@ -200,33 +212,33 @@ public:
 };
 
 template<class Child>
-class AstDeserializer: public AstSerDes
+class ContractDeserializer: public ContractSerDes
 {
 	constexpr inline Child* child() {
 		return static_cast<Child*>(this);
 	}
 
-	std::map<std::string, Ast::TypeDef> aliases;
+	std::map<std::string, Contract::TypeDef> aliases;
 
-	Ast::Primitive primitive()
+	Contract::Primitive primitive()
 	{
 		PrimitiveSelector p;
 		child()->read(p);
 
 		switch(p)
 		{
-			case PrimitiveSelector::I1: return Ast::Primitive{true, 1};
-			case PrimitiveSelector::U1: return Ast::Primitive{false, 1};
-			case PrimitiveSelector::I2: return Ast::Primitive{true, 2};
-			case PrimitiveSelector::U2: return Ast::Primitive{false, 2};
-			case PrimitiveSelector::I4: return Ast::Primitive{true, 4};
-			case PrimitiveSelector::U4: return Ast::Primitive{false, 4};
-			case PrimitiveSelector::I8: return Ast::Primitive{true, 8};
-			default: return Ast::Primitive{false, 8};
+			case PrimitiveSelector::I1: return Contract::Primitive{true, 1};
+			case PrimitiveSelector::U1: return Contract::Primitive{false, 1};
+			case PrimitiveSelector::I2: return Contract::Primitive{true, 2};
+			case PrimitiveSelector::U2: return Contract::Primitive{false, 2};
+			case PrimitiveSelector::I4: return Contract::Primitive{true, 4};
+			case PrimitiveSelector::U4: return Contract::Primitive{false, 4};
+			case PrimitiveSelector::I8: return Contract::Primitive{true, 8};
+			default: return Contract::Primitive{false, 8};
 		}
 	}
 
-	std::optional<Ast::TypeRef> typeRef()
+	std::optional<Contract::TypeRef> typeRef()
 	{
 		TypeRefSelector kind;
 		child()->read(kind);
@@ -244,11 +256,11 @@ class AstDeserializer: public AstSerDes
 		}
 	}
 
-	Ast::Collection collection()
+	Contract::Collection collection()
 	{
 		if(auto t = typeRef())
 		{
-			return Ast::Collection{std::make_shared<Ast::TypeRef>(*t)};
+			return Contract::Collection{std::make_shared<Contract::TypeRef>(*t)};
 		}
 		else
 		{
@@ -256,9 +268,9 @@ class AstDeserializer: public AstSerDes
 		}
 	}
 
-	std::vector<Ast::Var> varList()
+	std::vector<Contract::Var> varList()
 	{
-		std::vector<Ast::Var> ret;
+		std::vector<Contract::Var> ret;
 
 		while(auto t = this->typeRef())
 		{
@@ -274,25 +286,25 @@ class AstDeserializer: public AstSerDes
 		return ret;
 	}
 
-	Ast::Aggregate aggregate() {
-		return Ast::Aggregate{varList()};
+	Contract::Aggregate aggregate() {
+		return Contract::Aggregate{varList()};
 	}
 
-	Ast::Function func()
+	Contract::Function func()
 	{
 		std::string name;
 		child()->readIdentifier(name);
 		auto ret = typeRef();
 		auto args = varList();
-		return Ast::Function({name, args}, ret);
+		return Contract::Function({name, args}, ret);
 	}
 
-	Ast::Function action()
+	Contract::Function action()
 	{
 		std::string name;
 		child()->readIdentifier(name);
 		auto args = varList();
-		return {Ast::Action{name, args}, {}};
+		return {Contract::Action{name, args}, {}};
 	}
 
 	std::string aliasRef()
@@ -308,7 +320,7 @@ class AstDeserializer: public AstSerDes
 		return key;
 	}
 
-	Ast::TypeDef typeDef()
+	Contract::TypeDef typeDef()
 	{
 		TypeDefSelector kind;
 		child()->read(kind);
@@ -326,13 +338,13 @@ class AstDeserializer: public AstSerDes
 		}
 	}
 
-	Ast::Alias alias()
+	Contract::Alias alias()
 	{
 		std::string name;
 		child()->readIdentifier(name);
 		const auto t = typeDef();
 		aliases.insert({name, t});
-		return Ast::Alias{name, t};
+		return Contract::Alias{name, t};
 	}
 
 	template<class R>
@@ -343,12 +355,12 @@ class AstDeserializer: public AstSerDes
 		return {docs, content};
 	}
 
-	Ast::Session session()
+	Contract::Session session()
 	{
 		std::string name;
 		child()->readIdentifier(name);
 
-		std::vector<Ast::Session::Item> items;
+		std::vector<Contract::Session::Item> items;
 
 		while(true)
 		{
@@ -358,13 +370,13 @@ class AstDeserializer: public AstSerDes
 			switch(s)
 			{
 			case SessionItemSelector::ForwardCall:
-				items.push_back(readTheDocs<Ast::Session::Item>(Ast::Session::ForwardCall(action())));
+				items.push_back(readTheDocs<Contract::Session::Item>(Contract::Session::ForwardCall(action())));
 				break;
 			case SessionItemSelector::CallBack:
-				items.push_back(readTheDocs<Ast::Session::Item>(Ast::Session::CallBack(action())));
+				items.push_back(readTheDocs<Contract::Session::Item>(Contract::Session::CallBack(action())));
 				break;
 			case SessionItemSelector::Constructor:
-				items.push_back(readTheDocs<Ast::Session::Item>(Ast::Session::Ctor(func())));
+				items.push_back(readTheDocs<Contract::Session::Item>(Contract::Session::Ctor(func())));
 				break;
 			default:
 				return {name, std::move(items)};
@@ -373,9 +385,10 @@ class AstDeserializer: public AstSerDes
 	}
 
 public:
-	Ast build()
+	std::vector<Contract> build()
 	{
-		std::vector<Ast::Item> items;
+		std::vector<Contract> ret;
+		std::vector<Contract::Item> items;
 
 		while(true)
 		{
@@ -385,18 +398,30 @@ public:
 			switch(s)
 			{
 			case RootSelector::Func:
-				items.push_back(readTheDocs<Ast::Item>(func()));
+				items.push_back(readTheDocs<Contract::Item>(func()));
 				break;
 			case RootSelector::Type:
-				items.push_back(readTheDocs<Ast::Item>(alias()));
+				items.push_back(readTheDocs<Contract::Item>(alias()));
 				break;
 			case RootSelector::Session:
-				items.push_back(readTheDocs<Ast::Item>(session()));
+				items.push_back(readTheDocs<Contract::Item>(session()));
 				break;
 			default:
-				return {std::move(items)};
+				if(items.size() == 0)
+				{
+					return ret;
+				}
+
+				{
+					std::string name, docs;
+					child()->readIdentifier(name);
+					child()->readText(docs);
+					ret.push_back({std::move(items), std::move(name), std::move(docs)});
+				}
 			}
 		}
+
+
 	}
 };
 

@@ -1,5 +1,5 @@
-#include "ast/AstParser.h"
-#include "ast/AstFormatter.h"
+#include "ast/ContractParser.h"
+#include "ast/ContractFormatter.h"
 
 #include "InputOptions.h"
 #include "OutputOptions.h"

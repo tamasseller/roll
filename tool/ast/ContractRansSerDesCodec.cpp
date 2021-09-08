@@ -1,6 +1,6 @@
-#include "AstRansSerDesCodec.h"
+#include "ContractRansSerDesCodec.h"
 
-#include "AstSerDes.h"
+#include "ContractSerDes.h"
 #include "RansCodec.h"
 
 #include <functional>
@@ -105,7 +105,7 @@ static inline char textIndexToChar(char x)
 
 }
 
-struct RansSink: AstSerializer<RansSink>
+struct RansSink: ContractSerializer<RansSink>
 {
 	size_t wcTotalStringOverhead = 0;
 	std::vector<std::function<void(RansEncoder &)>> items;
@@ -189,7 +189,7 @@ struct RansSink: AstSerializer<RansSink>
 	}
 };
 
-struct RansSource: AstDeserializer<RansSource>, RansDecoder
+struct RansSource: ContractDeserializer<RansSource>, RansDecoder
 {
 	RansSource(std::istream &input): RansDecoder(input) {}
 
@@ -315,7 +315,7 @@ void selftest()
 		assert(r == idx && s == idx && t == idx);
 	}
 
-	AstSerDes::RootSelector rootSelectorValues[] = {AstSerDes::RootSelector::Func, AstSerDes::RootSelector::Type, AstSerDes::RootSelector::Session, AstSerDes::RootSelector::None };
+	ContractSerDes::RootSelector rootSelectorValues[] = {ContractSerDes::RootSelector::Func, ContractSerDes::RootSelector::Type, ContractSerDes::RootSelector::Session, ContractSerDes::RootSelector::None };
 	static_assert(sizeof(rootSelectorValues) / sizeof(rootSelectorValues[0]) == 4);
 
 	for(auto c: rootSelectorValues)
@@ -341,7 +341,7 @@ void selftest()
 		assert(r == idx && s == idx && t == idx);
 	}
 
-	AstSerDes::PrimitiveSelector primitiveSelectorValues[] = {AstSerDes::PrimitiveSelector::I1, AstSerDes::PrimitiveSelector::U1, AstSerDes::PrimitiveSelector::I2, AstSerDes::PrimitiveSelector::U2, AstSerDes::PrimitiveSelector::I4, AstSerDes::PrimitiveSelector::U4, AstSerDes::PrimitiveSelector::I8, AstSerDes::PrimitiveSelector::U8};
+	ContractSerDes::PrimitiveSelector primitiveSelectorValues[] = {ContractSerDes::PrimitiveSelector::I1, ContractSerDes::PrimitiveSelector::U1, ContractSerDes::PrimitiveSelector::I2, ContractSerDes::PrimitiveSelector::U2, ContractSerDes::PrimitiveSelector::I4, ContractSerDes::PrimitiveSelector::U4, ContractSerDes::PrimitiveSelector::I8, ContractSerDes::PrimitiveSelector::U8};
 	static_assert(sizeof(primitiveSelectorValues) / sizeof(primitiveSelectorValues[0]) == 8);
 
 	for(auto c: primitiveSelectorValues)
@@ -356,7 +356,7 @@ void selftest()
 		assert(r == idx && s == idx && t == idx);
 	}
 
-	AstSerDes::SessionItemSelector sessionItemSelectorValues[] = {AstSerDes::SessionItemSelector::Constructor, AstSerDes::SessionItemSelector::ForwardCall, AstSerDes::SessionItemSelector::CallBack, AstSerDes::SessionItemSelector::None};
+	ContractSerDes::SessionItemSelector sessionItemSelectorValues[] = {ContractSerDes::SessionItemSelector::Constructor, ContractSerDes::SessionItemSelector::ForwardCall, ContractSerDes::SessionItemSelector::CallBack, ContractSerDes::SessionItemSelector::None};
 	static_assert(sizeof(sessionItemSelectorValues) / sizeof(sessionItemSelectorValues[0]) == 4);
 
 	for(auto c: sessionItemSelectorValues)
@@ -372,7 +372,7 @@ void selftest()
 	}
 }
 
-std::string serialize(const Ast& ast)
+std::string serialize(const std::vector<Contract>& ast)
 {
 	selftest();
 
@@ -389,7 +389,7 @@ std::string serialize(const Ast& ast)
 	return ss.str();
 }
 
-Ast deserialize(std::istream& input)
+std::vector<Contract> deserialize(std::istream& input)
 {
 	unsigned char v;
 	input.read((char*)&v, 1);

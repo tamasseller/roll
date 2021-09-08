@@ -1,3 +1,11 @@
+/* empty contract */
+$empty;
+$dummy;
+
+string = [[u8]];
+
+$test;
+
 string = [i1];
 
 /* two line

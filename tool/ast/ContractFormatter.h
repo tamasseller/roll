@@ -1,7 +1,7 @@
-#ifndef RPC_TOOL_AST_ASTFORMATTER_H_
-#define RPC_TOOL_AST_ASTFORMATTER_H_
+#ifndef RPC_TOOL_AST_CONTRACTFORMATTER_H_
+#define RPC_TOOL_AST_CONTRACTFORMATTER_H_
 
-#include "Ast.h"
+#include "Contract.h"
 
 struct FormatOptions
 {
@@ -46,6 +46,6 @@ public:
 	inline std::string formatNewlineIndentDelimit(const int n, const std::string& str, const char start, const char end) const;
 };
 
-std::string format(const FormatOptions& opts, const Ast& ast);
+std::string format(const FormatOptions& opts, const std::vector<Contract>& ast);
 
-#endif /* RPC_TOOL_AST_ASTFORMATTER_H_ */
+#endif /* RPC_TOOL_AST_CONTRACTFORMATTER_H_ */

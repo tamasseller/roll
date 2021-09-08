@@ -1,5 +1,5 @@
-#include "AstParser.h"
-#include "AstRansSerDesCodec.h"
+#include "ContractParser.h"
+#include "ContractRansSerDesCodec.h"
 
 #include "rpcParser.h"
 #include "rpcLexer.h"
@@ -10,7 +10,7 @@
 
 struct SemanticParser
 {
-	std::map<std::string, Ast::TypeDef> aliases;
+	std::map<std::string, Contract::TypeDef> aliases;
 
 	static constexpr inline int getLength(char c)
 	{
@@ -24,7 +24,7 @@ struct SemanticParser
 		return uint8_t(-1u);
 	}
 
-	static inline Ast::Primitive makePrimitive(const std::string& str) {
+	static inline Contract::Primitive makePrimitive(const std::string& str) {
 		return {str[0] == 'i' || str[0] == 'I', getLength(str[1])};
 	}
 
@@ -53,7 +53,7 @@ struct SemanticParser
 		return {};
 	}
 
-	inline std::string makeDocs(antlr4::Token *t) const
+	static inline std::string makeDocs(antlr4::Token *t)
 	{
 		if(t)
 		{
@@ -84,49 +84,49 @@ struct SemanticParser
 		return {};
 	}
 
-	inline Ast::Var makeVar(rpcParser::VarContext* ctx) const {
+	inline Contract::Var makeVar(rpcParser::VarContext* ctx) const {
 		return { ctx->name->getText(), resolveTypeRef(ctx->t), makeDocs(ctx->docs)};
 	}
 
-	template<class It> std::vector<Ast::Var> parseVarList(It begin, It end) const
+	template<class It> std::vector<Contract::Var> parseVarList(It begin, It end) const
 	{
-		std::vector<Ast::Var> ret;
+		std::vector<Contract::Var> ret;
 		std::transform(begin, end, std::back_inserter(ret), [this](auto ctx) { return makeVar(ctx); });
 		return ret;
 	}
 
-	inline Ast::Action makeCall(rpcParser::ActionContext* ctx) const {
+	inline Contract::Action makeCall(rpcParser::ActionContext* ctx) const {
 		return {ctx->name->getText(), parseVarList(ctx->args->vars.begin(), ctx->args->vars.end())};
 	}
 
-	inline Ast::Function makeFunc(rpcParser::FunctionContext* ctx) const
+	inline Contract::Function makeFunc(rpcParser::FunctionContext* ctx) const
 	{
 		if(ctx->ret)
 		{
-			return Ast::Function(makeCall(ctx->call), resolveTypeRef(ctx->ret));
+			return Contract::Function(makeCall(ctx->call), resolveTypeRef(ctx->ret));
 		}
 		else
 		{
-			return Ast::Function(makeCall(ctx->call), {});
+			return Contract::Function(makeCall(ctx->call), {});
 		}
 	}
 
-	inline std::vector<Ast::Session::Item> parseSession(std::vector<rpcParser::SessionItemContext *> items) const
+	inline std::vector<Contract::Session::Item> parseSession(std::vector<rpcParser::SessionItemContext *> items) const
 	{
-		std::vector<Ast::Session::Item> ret;
-		std::transform(items.begin(), items.end(), std::back_inserter(ret), [this](const auto& i) -> Ast::Session::Item
+		std::vector<Contract::Session::Item> ret;
+		std::transform(items.begin(), items.end(), std::back_inserter(ret), [this](const auto& i) -> Contract::Session::Item
 		{
 			if(auto d = i->fwd)
 			{
-				return {makeDocs(i->docs), Ast::Session::ForwardCall(makeCall(d->sym))};
+				return {makeDocs(i->docs), Contract::Session::ForwardCall(makeCall(d->sym))};
 			}
 			else if(auto d = i->bwd)
 			{
-				return {makeDocs(i->docs), Ast::Session::CallBack(makeCall(d->sym))};
+				return {makeDocs(i->docs), Contract::Session::CallBack(makeCall(d->sym))};
 			}
 			else if(auto d = i->ctr)
 			{
-				return {makeDocs(i->docs), Ast::Session::CallBack(makeFunc(d))};
+				return {makeDocs(i->docs), Contract::Session::CallBack(makeFunc(d))};
 			}
 
 			throw std::runtime_error("Internal error: unknown session item kind");
@@ -135,8 +135,8 @@ struct SemanticParser
 		return ret;
 	}
 
-	inline Ast::Session makeSession(rpcParser::SessionContext* ctx) const {
-		return Ast::Session{ctx->name->getText(), parseSession(ctx->items)};
+	inline Contract::Session makeSession(rpcParser::SessionContext* ctx) const {
+		return Contract::Session{ctx->name->getText(), parseSession(ctx->items)};
 	}
 
 	inline std::string checkAlias(const std::string& name) const
@@ -149,7 +149,7 @@ struct SemanticParser
 		return name;
 	}
 
-	inline Ast::TypeRef resolveTypeRef(rpcParser::TyperefContext* ctx) const
+	inline Contract::TypeRef resolveTypeRef(rpcParser::TyperefContext* ctx) const
 	{
 		if(auto data = ctx->p)
 		{
@@ -157,7 +157,7 @@ struct SemanticParser
 		}
 		else if(auto data = ctx->c)
 		{
-			return Ast::Collection{std::make_shared<Ast::TypeRef>(resolveTypeRef(data->elementType))};
+			return Contract::Collection{std::make_shared<Contract::TypeRef>(resolveTypeRef(data->elementType))};
 		}
 		else if(auto data = ctx->n)
 		{
@@ -167,13 +167,13 @@ struct SemanticParser
 		throw std::runtime_error("Internal error: unknown type kind in reference");
 	}
 
-	inline Ast::TypeDef addAlias(const std::string &name, Ast::TypeDef ret)
+	inline Contract::TypeDef addAlias(const std::string &name, Contract::TypeDef ret)
 	{
 		aliases.emplace(name, ret);
 		return ret;
 	}
 
-	inline Ast::TypeDef resolveTypeDef(rpcParser::TypeAliasContext* ctx)
+	inline Contract::TypeDef resolveTypeDef(rpcParser::TypeAliasContext* ctx)
 	{
 		const auto name = ctx->name->getText();
 
@@ -183,7 +183,7 @@ struct SemanticParser
 		}
 		else if(auto data = ctx->c)
 		{
-			return addAlias(name, Ast::Collection{std::make_shared<Ast::TypeRef>(resolveTypeRef(data->elementType))});
+			return addAlias(name, Contract::Collection{std::make_shared<Contract::TypeRef>(resolveTypeRef(data->elementType))});
 		}
 		else if(auto data = ctx->n)
 		{
@@ -191,13 +191,13 @@ struct SemanticParser
 		}
 		else if(auto data = ctx->a)
 		{
-			return addAlias(name, Ast::Aggregate{parseVarList(data->members->vars.begin(), data->members->vars.end())});
+			return addAlias(name, Contract::Aggregate{parseVarList(data->members->vars.begin(), data->members->vars.end())});
 		}
 
 		throw std::runtime_error("Internal error: unknown type kind in definition");
 	}
 
-	inline Ast::Item processItem(rpcParser::ItemContext* s)
+	inline Contract::Item processItem(rpcParser::ItemContext* s)
 	{
 		if(auto d = s->func)
 		{
@@ -205,25 +205,50 @@ struct SemanticParser
 		}
 		else if(auto d = s->alias)
 		{
-			return {makeDocs(s->docs), Ast::Alias{d->name->getText(), resolveTypeDef(d)}};
+			return {makeDocs(s->docs), Contract::Alias{d->name->getText(), resolveTypeDef(d)}};
 		}
-		else
+		else if(auto d = s->sess)
 		{
-			return {makeDocs(s->docs), makeSession(s->sess)};
+			return {makeDocs(s->docs), makeSession(d)};
 		}
+
+		throw std::runtime_error("Unknown contract item");
 	}
 
 public:
-	static inline Ast parse(rpcParser::RpcContext* ctx)
+	static inline std::vector<Contract> parse(rpcParser::RpcContext* ctx)
 	{
-		SemanticParser sps;
-		std::vector<Ast::Item> items;
-		std::transform(ctx->items.begin(), ctx->items.end(), std::back_inserter(items), [&sps](auto s){return sps.processItem(s); });
-		return {std::move(items)};
+		std::vector<Contract> ret;
+
+		auto it = ctx->items.begin();
+
+		while(it != ctx->items.end())
+		{
+			if(!(*it)->cont)
+			{
+				throw std::runtime_error("No active contract definition");
+			}
+
+			auto contract = (*it++);
+			auto docs = makeDocs(contract->docs);
+			auto name = contract->cont->name->getText();
+
+			SemanticParser sps;
+			std::vector<Contract::Item> items;
+
+			while(it != ctx->items.end() && !(*it)->cont)
+			{
+				items.push_back(sps.processItem(*it++));
+			}
+
+			ret.push_back({std::move(items), name, docs});
+		}
+
+		return ret;
 	}
 };
 
-Ast parse(std::istream& is)
+std::vector<Contract> parse(std::istream& is)
 {
 	if(isprint(is.peek()))
 	{

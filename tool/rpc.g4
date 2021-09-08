@@ -16,10 +16,11 @@ callBack: '@' WS* sym=action;
 sessionItem: WS* (docs=DOCS)? WS* (fwd=fwdCall | bwd=callBack | ctr=function) WS* ;
 session: name=IDENTIFIER WS* '<' WS* items+=sessionItem (DECLSEP+ (items+=sessionItem)? WS*)*? '>';
 
-item: WS* (docs=DOCS)? WS* (func=function | alias=typeAlias | sess=session) WS*;
+contract: '$' WS* name=IDENTIFIER;
 
+item: WS* (docs=DOCS)? WS* (cont=contract | func=function | alias=typeAlias | sess=session) WS*;
 rpc: items+=item (DECLSEP+ (items+=item | EOF))*;
- 
+
 PRIMITIVE:      [IiUu][1248];
 IDENTIFIER:     [_a-zA-Z][_a-zA-Z0-9]*;
 DOCS:			'/*' .*? '*/';
@@ -28,3 +29,4 @@ VALSEP:      	WS* ':' WS*;
 DECLSEP:        WS* ';' WS*;
 NAMEVALSEP:     WS* '=' WS*;
 WS:             ('\r'? '\n') | [\t ];
+COMMENT: 		'#' ~[\r\n]* '\n';
