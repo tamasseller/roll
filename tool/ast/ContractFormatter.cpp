@@ -72,7 +72,7 @@ inline std::string FormatOptions::formatNewlineIndentDelimit(const int n, const 
 
 static inline std::string typeRef(const FormatOptions& opts, const int n, const Contract::TypeRef& t);
 
-static inline std::string formatComent(const FormatOptions& opts, const int n, const std::string &text, bool firstItemInList)
+static inline std::string formatComment(const FormatOptions& opts, const int n, const std::string &text, bool firstItemInList)
 {
 	std::stringstream ss;
 
@@ -142,7 +142,7 @@ static inline std::string formatComent(const FormatOptions& opts, const int n, c
 }
 
 static inline std::string memberItem(const FormatOptions& opts, const int n, const Contract::Var &v, FormatOptions::Highlight h, bool first) {
-	return formatComent(opts, n, v.docs, first) + opts.colorize(v.name, h) + ": "  + typeRef(opts, n, v.type);
+	return formatComment(opts, n, v.docs, first) + opts.colorize(v.name, h) + ": "  + typeRef(opts, n, v.type);
 }
 
 template<class C, class F>
@@ -256,7 +256,7 @@ static inline std::string formatItem(const FormatOptions& opts, const int n, con
 	return opts.indent(n) + opts.colorize(s.name, FormatOptions::Highlight::Session)
 			+ "\n" + opts.indent(n) + "<\n"
 			+ std::accumulate(s.items.begin(), s.items.end(), std::string{}, [n, &opts, first{true}](const std::string a, const auto &i) mutable{
-				const auto ret = a + opts.indent(n + 1) + formatComent(opts, n + 1, i.first, first)
+				const auto ret = a + opts.indent(n + 1) + formatComment(opts, n + 1, i.first, first)
 								+ std::visit([&opts, n](auto& v) {return formatSessionItem(opts, n + 1, v);}, i.second) + ";\n";
 				first = false;
 				return ret;
@@ -270,11 +270,11 @@ std::string format(const FormatOptions& opts, const std::vector<Contract>& ast)
 
 	for(const auto& c: ast)
 	{
-		ss << formatComent(opts, 0, c.docs, true) << "$" << c.name << ";" << std::endl;
+		ss << formatComment(opts, 0, c.docs, true) << "$" << c.name << ";" << std::endl;
 
 		std::transform(c.items.begin(), c.items.end(), std::ostream_iterator<std::string>(ss, "\n"), [&opts](const auto& s)
 		{
-			return formatComent(opts, 0, s.first, false) + std::visit([&opts](const auto &s){return formatItem(opts, 0, s); }, s.second);
+			return formatComment(opts, 0, s.first, false) + std::visit([&opts](const auto &s){return formatItem(opts, 0, s); }, s.second);
 		});
 
 		ss << std::endl;

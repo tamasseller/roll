@@ -19,7 +19,7 @@ CLI_APP(codegen, "Generate source code from contract descriptor")
 	{
 		const auto ast = parse(*opts.input);
 		const auto src = opts.invokeGenerator(ast);
-		*opts.output << src << std::endl;
+		*opts.output << src;
 		return 0;
 	}
 

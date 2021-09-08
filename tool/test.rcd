@@ -2,37 +2,38 @@
 $empty;
 $dummy;
 
-string = [[u8]];
+str = [[u8]];
 
+/* the real test contract */
 $test;
 
-string = [i1];
+str = [i1];
 
 /* two line
    comment with indentation */
-ztring = string;
+ztring = str;
 
 /*
  * Properly boxed comment
  */
-struct = 
+schtruzt = 
 {
 	/* three line
 		 badly spaced comment
 	 with non trival indentation */ 
-	str: string, 
+	str: str, 
 	/* at predefined locations */ id : u4 
 };
 
 /* this returns something */
-bar(elements :[struct]): i4 ;
+bar(elements :[schtruzt]): i4 ;
  /* this is foo */ foo(/*number of names*/num: i4, /* namen*/name:[i1] );
 nop();
 set(v: i2);
 now(): u8;
 name(): [i1];
-if = {name:[i1] , id:i4 ,corr:u4};
-ifs(): [if];
+netif = {name:[i1] , id:i4 ,corr:u4};
+ifs(): [netif];
 s1 = {s:i1};
 s2 = {a:i1};
 s3 = {c:[s2]};
@@ -40,37 +41,82 @@ s4 = {e:[s3]};
 stupid(s: s1): s4; 
 
 /* session */
-session < !echo(v:string); @echo(v:string)  >;
+session < !echo(v:str); @echo(v:str); start() >;
 
 /* function */ 
-getChannels(): [string];
+getChannels(): [str];
 
 acquistion 
 <
 	/*
 	 * Properly boxed comment at nonzero base indent
 	 */
-	start(channel: string);
+	start(channel: str);
 	
 	/* forward call */
-	!set(property: string, value: string);
-	!get(property: string);
+	!set(property: str, value: str);
+	!get(property: str);
 	
 	/* callback */
-	@onPropertyValue(property: string, value: string);
+	@onPropertyValue(property: str, value: str);
 	
 	@onData(data:[u1]);
 >;
 
-/* typedef */
+/* Topology Discovery Protocol */
+$tdp;
+
+/* A character string */
+Str = [i4];
+
+/* Correlation identifier of a host */
 HostId = u4;
+
+/* Correlation identifier of a network interface */
 NetifId = u4;
-HostInfo = {hostId: HostId, names: [string]};
 
-tdp
+/* Correlation identifier of a network interface */
+LocalIndex = u4;
+
+/* Detailed information about the host carrying out the scan operation */ 
+HostInfo = 
+{
+	/* The correlation id of the scanning  host */
+	hostId: HostId,
+	
+	/* List of host names */ 
+	names: [Str]
+};
+
+/* Discovery session*/
+session
 <
+	/* Start discovery process with specified query identifier */
 	start(queryId: u4): HostInfo;
-	@onInterface(netifId: NetifId, ifNum: i4, names: [string]);
-	@onPeer(hostId: HostId, v:string)
+	
+	/* Callback invoked when starting discovery process on an active network interface*/
+	@nextInterface
+	(
+		/* Correlation id of the scanning interface */ 
+		netifId: NetifId,
+		
+		/* The local interface index of the scanning interface*/ 
+		ifNum: LocalIndex,
+		
+		/* A list of names fot the interface */ 
+		names: [Str]
+	);
+	
+	/* Callback invoked for every discovered peer on the last reported interface */
+	@peerFound
+	(
+		/* Correlation id of the discovered host */
+		hostId: HostId,
+		
+		/* Correlation id of the discovered host */
+		index: NetifId,
+		
+		/* The link address from which the peer responded */ 
+		linkAddress: Str
+	)
 >;
-

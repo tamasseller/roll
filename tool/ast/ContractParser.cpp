@@ -1,12 +1,24 @@
 #include "ContractParser.h"
 #include "ContractRansSerDesCodec.h"
 
+#include "Taboo.h"
+
 #include "rpcParser.h"
 #include "rpcLexer.h"
 
 #include <map>
 #include <algorithm>
 #include <cassert>
+
+static inline std::string validateName(const std::string& str)
+{
+	if(forbiddenNames.find(str) != forbiddenNames.end())
+	{
+		throw std::runtime_error("Name '" + str + "' is forbidden");
+	}
+
+	return str;
+}
 
 struct SemanticParser
 {
@@ -85,7 +97,7 @@ struct SemanticParser
 	}
 
 	inline Contract::Var makeVar(rpcParser::VarContext* ctx) const {
-		return { ctx->name->getText(), resolveTypeRef(ctx->t), makeDocs(ctx->docs)};
+		return { validateName(ctx->name->getText()), resolveTypeRef(ctx->t), makeDocs(ctx->docs)};
 	}
 
 	template<class It> std::vector<Contract::Var> parseVarList(It begin, It end) const
@@ -96,7 +108,7 @@ struct SemanticParser
 	}
 
 	inline Contract::Action makeCall(rpcParser::ActionContext* ctx) const {
-		return {ctx->name->getText(), parseVarList(ctx->args->vars.begin(), ctx->args->vars.end())};
+		return {validateName(ctx->name->getText()), parseVarList(ctx->args->vars.begin(), ctx->args->vars.end())};
 	}
 
 	inline Contract::Function makeFunc(rpcParser::FunctionContext* ctx) const
@@ -126,7 +138,7 @@ struct SemanticParser
 			}
 			else if(auto d = i->ctr)
 			{
-				return {makeDocs(i->docs), Contract::Session::CallBack(makeFunc(d))};
+				return {makeDocs(i->docs), Contract::Session::Ctor(makeFunc(d))};
 			}
 
 			throw std::runtime_error("Internal error: unknown session item kind");
@@ -136,7 +148,7 @@ struct SemanticParser
 	}
 
 	inline Contract::Session makeSession(rpcParser::SessionContext* ctx) const {
-		return Contract::Session{ctx->name->getText(), parseSession(ctx->items)};
+		return Contract::Session{validateName(ctx->name->getText()), parseSession(ctx->items)};
 	}
 
 	inline std::string checkAlias(const std::string& name) const
@@ -175,7 +187,7 @@ struct SemanticParser
 
 	inline Contract::TypeDef resolveTypeDef(rpcParser::TypeAliasContext* ctx)
 	{
-		const auto name = ctx->name->getText();
+		const auto name = validateName(ctx->name->getText());
 
 		if(auto data = ctx->p)
 		{
@@ -205,7 +217,7 @@ struct SemanticParser
 		}
 		else if(auto d = s->alias)
 		{
-			return {makeDocs(s->docs), Contract::Alias{d->name->getText(), resolveTypeDef(d)}};
+			return {makeDocs(s->docs), Contract::Alias{validateName(d->name->getText()), resolveTypeDef(d)}};
 		}
 		else if(auto d = s->sess)
 		{
@@ -231,7 +243,7 @@ public:
 
 			auto contract = (*it++);
 			auto docs = makeDocs(contract->docs);
-			auto name = contract->cont->name->getText();
+			auto name = validateName(contract->cont->name->getText());
 
 			SemanticParser sps;
 			std::vector<Contract::Item> items;

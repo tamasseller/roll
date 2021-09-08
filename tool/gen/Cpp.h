@@ -7,8 +7,8 @@ class CodeGenCpp: public CodeGen
 {
 	inline virtual ~CodeGenCpp() = default;
 
-	virtual std::string generateClient(const Contract&) const override;
-	virtual std::string generateServer(const Contract&) const override;
+	virtual std::string generateClient(const std::vector<Contract>&) const override;
+	virtual std::string generateServer(const std::vector<Contract>&) const override;
 
 public:
 	static const CodeGenCpp instance;

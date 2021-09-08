@@ -8,14 +8,14 @@
 struct CodeGen
 {
 	inline virtual ~CodeGen() = default;
-	virtual std::string generateClient(const Contract&) const = 0;
-	virtual std::string generateServer(const Contract&) const = 0;
+	virtual std::string generateClient(const std::vector<Contract>&) const = 0;
+	virtual std::string generateServer(const std::vector<Contract>&) const = 0;
 };
 
 struct GeneratorOptions
 {
 	const CodeGen* language;
-	std::string (CodeGen::* direction)(const Contract&) const = &CodeGen::generateClient;
+	std::string (CodeGen::* direction)(const std::vector<Contract>&) const = &CodeGen::generateClient;
 
 	void select(const std::string &str);
 
@@ -44,12 +44,7 @@ public:
 	inline std::string invokeGenerator(const std::vector<Contract>& ast)
 	{
 		std::stringstream ss;
-
-		for(const auto& c: ast)
-		{
-			ss << (language->*direction)(c);
-		}
-
+		ss << (language->*direction)(ast) << std::endl;
 		return ss.str();
 	}
 };
