@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <numeric>
 
+#include <cassert>
+
 static constexpr const char* resetColor = "\x1b[0m";
 
 static inline std::string getColorFor(FormatOptions::Highlight kind)
@@ -70,15 +72,63 @@ inline std::string FormatOptions::formatNewlineIndentDelimit(const int n, const 
 
 static inline std::string typeRef(const FormatOptions& opts, const int n, const Ast::TypeRef& t);
 
-static inline std::string formatComent(const FormatOptions& opts, const int n, const std::string &text)
+static inline std::string formatComent(const FormatOptions& opts, const int n, const std::string &text, bool firstItemInList)
 {
 	std::stringstream ss;
 
 	if(text.length())
 	{
-		ss << "/* " << text << " */";
+		std::stringstream in(text);
 
-		if(opts.pretty)
+		std::string line;
+		bool gotLine = (bool)std::getline(in, line, '\n');
+		assert(gotLine);
+
+		bool first = true;
+		bool multiLine = false;
+		while(true)
+		{
+			if(first)
+			{
+				if(opts.pretty && !firstItemInList)
+				{
+					ss << "\n" << opts.indent(n);
+				}
+
+				ss << "/* ";
+				first = false;
+			}
+			else if(line.length())
+			{
+				if(line[0] == '*')
+				{
+					ss << " ";
+				}
+				else
+				{
+					ss << "   ";
+				}
+			}
+
+			ss << line;
+
+			std::string next(1, '\0');
+			if(std::getline(in, next, '\n') || !(next.length() == 1 && next[0] == '\0'))
+			{
+				ss << std::endl << opts.indent(n);
+				line = std::move(next);
+			}
+			else
+			{
+				break;
+			}
+
+			multiLine = true;
+		}
+
+		ss << " */";
+
+		if(opts.pretty || multiLine)
 		{
 			ss << "\n" << opts.indent(n);
 		}
@@ -91,18 +141,24 @@ static inline std::string formatComent(const FormatOptions& opts, const int n, c
 	return ss.str();
 }
 
-static inline std::string memberItem(const FormatOptions& opts, const int n, const Ast::Var &v, FormatOptions::Highlight h) {
-	return formatComent(opts, n, v.docs) + opts.colorize(v.name, h) + ": "  + typeRef(opts, n, v.type);
+static inline std::string memberItem(const FormatOptions& opts, const int n, const Ast::Var &v, FormatOptions::Highlight h, bool first) {
+	return formatComent(opts, n, v.docs, first) + opts.colorize(v.name, h) + ": "  + typeRef(opts, n, v.type);
 }
 
 template<class C, class F>
-static inline std::string list(const FormatOptions& opts, const int n, const C &vs, F&& f)
+static inline std::string list(const FormatOptions& opts, const int n, const C &r, F&& f)
 {
+	std::vector<std::string> vs;
+	for(const auto& v: r)
+	{
+		vs.push_back(f(opts, n, v));
+	}
+
 	if(vs.size())
 	{
-		if(const auto first = f(opts, n, vs.front()); vs.size() == 1 && first.find('\n') == std::string::npos)
+		if(vs.size() == 1 && vs.front().find('\n') == std::string::npos)
 		{
-			return first;
+			return vs.front();
 		}
 
 		std::stringstream ss;
@@ -110,15 +166,7 @@ static inline std::string list(const FormatOptions& opts, const int n, const C &
 		bool isFirst = true;
 		for(const auto& v: vs)
 		{
-			if(opts.pretty)
-			{
-				ss << (isFirst ? "\n" : ",\n") << opts.indent(n) << f(opts, n, v);
-			}
-			else
-			{
-				ss << (isFirst ? "" : ", ") << f(opts, n, v);
-			}
-
+			ss << (isFirst ? "" : ", ") << ((opts.pretty) ? ("\n" + opts.indent(n)) : std::string{}) << v;
 			isFirst = false;
 		}
 
@@ -149,10 +197,14 @@ static inline std::string typeDefKindToString(const FormatOptions& opts, const i
 	return typeRefKindToString(opts, n, v);
 }
 
-static inline std::string typeDefKindToString(const FormatOptions& opts, const int n, const Ast::Aggregate& c) {
-	return opts.formatNewlineIndentDelimit(n, list(opts, n + 1, c.members, [](const FormatOptions& opts, const int n, const Ast::Var& v){
-		return memberItem(opts, n, v, FormatOptions::Highlight::Member);}
-	), '{', '}');
+static inline std::string typeDefKindToString(const FormatOptions& opts, const int n, const Ast::Aggregate& c)
+{
+	return opts.formatNewlineIndentDelimit(n, list(opts, n + 1, c.members, [first{true}](const FormatOptions& opts, const int n, const Ast::Var& v) mutable
+	{
+		auto ret = memberItem(opts, n, v, FormatOptions::Highlight::Member, first);
+		first = false;
+		return ret;
+	}), '{', '}');
 }
 
 static inline std::string typeDef(const FormatOptions& opts, const int n, const Ast::TypeDef& t) {
@@ -161,9 +213,11 @@ static inline std::string typeDef(const FormatOptions& opts, const int n, const 
 
 static inline std::string argumentList(const FormatOptions& opts, const int n, const std::vector<Ast::Var> &args)
 {
-	return opts.formatNewlineIndentDelimit(n, list(opts, n + 1, args, [](const FormatOptions& opts, const int n, const Ast::Var& v){
-		return memberItem(opts, n, v, FormatOptions::Highlight::Argument);}
-	), '(', ')');
+	return opts.formatNewlineIndentDelimit(n, list(opts, n + 1, args, [first{true}](const FormatOptions& opts, const int n, const Ast::Var& v) mutable {
+		auto ret = memberItem(opts, n, v, FormatOptions::Highlight::Argument, first);
+		first = false;
+		return ret;
+	}), '(', ')');
 }
 
 static inline std::string signature(const FormatOptions& opts, const int n, const Ast::Action& s) {
@@ -182,7 +236,7 @@ static inline std::string formatItem(const FormatOptions& opts, const int n, con
 }
 
 static inline std::string formatItem(const FormatOptions& opts, const int n, const Ast::Alias& s) {
-	return opts.indent(n) + opts.colorize(s.name, FormatOptions::Highlight::TypeDef) + " = " + typeDef(opts, n + 1, s.type) + ";";
+	return opts.indent(n) + opts.colorize(s.name, FormatOptions::Highlight::TypeDef) + " = " + typeDef(opts, n, s.type) + ";";
 }
 
 static inline std::string formatSessionItem(const FormatOptions& opts, const int n, const Ast::Session::ForwardCall& s) {
@@ -201,9 +255,11 @@ static inline std::string formatItem(const FormatOptions& opts, const int n, con
 {
 	return opts.indent(n) + opts.colorize(s.name, FormatOptions::Highlight::Session)
 			+ "\n" + opts.indent(n) + "<\n"
-			+ std::accumulate(s.items.begin(), s.items.end(), std::string{}, [n, &opts](const std::string a, const auto &i){
-				return a + opts.indent(n + 1) + formatComent(opts, n + 1, i.first)
-						+ std::visit([&opts, n](auto& v) {return formatSessionItem(opts, n + 1, v);}, i.second) + ";\n";
+			+ std::accumulate(s.items.begin(), s.items.end(), std::string{}, [n, &opts, first{true}](const std::string a, const auto &i) mutable{
+				const auto ret = a + opts.indent(n + 1) + formatComent(opts, n + 1, i.first, first)
+								+ std::visit([&opts, n](auto& v) {return formatSessionItem(opts, n + 1, v);}, i.second) + ";\n";
+				first = false;
+				return ret;
 			})
 			+ opts.indent(n) + ">;";
 }
@@ -214,7 +270,7 @@ std::string format(const FormatOptions& opts, const Ast& ast)
 
 	std::transform(ast.items.begin(), ast.items.end(), std::ostream_iterator<std::string>(ss, "\n"), [&opts](const auto& s)
 	{
-		return formatComent(opts, 0, s.first) + std::visit([&opts](const auto &s){return formatItem(opts, 0, s); }, s.second);
+		return formatComent(opts, 0, s.first, false) + std::visit([&opts](const auto &s){return formatItem(opts, 0, s); }, s.second);
 	});
 
 	return ss.str();

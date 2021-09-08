@@ -28,31 +28,57 @@ struct SemanticParser
 		return {str[0] == 'i' || str[0] == 'I', getLength(str[1])};
 	}
 
+	static inline std::string trim(std::string full, size_t initialOffset, size_t finalOffset)
+	{
+		std::string ws = " \t\r\n";
+		assert(full.length() >= initialOffset + finalOffset);
+
+		size_t first = 0, last = 0;
+		for(size_t idx = initialOffset; idx < full.length() - finalOffset; idx++)
+		{
+			if(ws.find(full[idx]) == std::string::npos)
+			{
+				if(!first)
+					first = idx;
+
+				last = idx;
+			}
+		}
+
+		if(first)
+		{
+			return full.substr(first, last - first + 1);
+		}
+
+		return {};
+	}
 
 	inline std::string makeDocs(antlr4::Token *t) const
 	{
 		if(t)
 		{
-			std::string ws = " \t\r\n";
-			const std::string full = t->getText();
-			assert(full.length() >= 4);
+			std::stringstream in(t->getText());
+			std::vector<std::string> lines;
+			int n = 0;
 
-			size_t first = 0, last = 0;
-			for(size_t idx = 2; idx < full.length() - 2; idx++)
+			for(std::string to; std::getline(in, to, '\n');)
 			{
-				if(ws.find(full[idx]) == std::string::npos)
-				{
-					if(!first)
-						first = idx;
+				lines.push_back(std::move(to));
+				n++;
+			}
 
-					last = idx;
+			std::stringstream out;
+			for(int i = 0; i < n; i++)
+			{
+				out << trim(lines[i], i == 0 ? 2 : 0, i == (n-1) ? 2 : 0);
+
+				if(i != (n-1))
+				{
+					out << std::endl;
 				}
 			}
 
-			if(first)
-			{
-				return full.substr(first, last - first + 1);
-			}
+			return out.str();
 		}
 
 		return {};

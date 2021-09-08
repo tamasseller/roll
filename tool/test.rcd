@@ -1,16 +1,24 @@
 string = [i1];
+
+/* two line
+   comment with indentation */
 ztring = string;
 
+/*
+ * Properly boxed comment
+ */
 struct = 
 {
-	/* documentation comment */ 
+	/* three line
+		 badly spaced comment
+	 with non trival indentation */ 
 	str: string, 
 	/* at predefined locations */ id : u4 
 };
 
 /* this returns something */
 bar(elements :[struct]): i4 ;
- /* this is foo */ foo(num: i4, name:[i1] );
+ /* this is foo */ foo(/*number of names*/num: i4, /* namen*/name:[i1] );
 nop();
 set(v: i2);
 now(): u8;
@@ -31,7 +39,9 @@ getChannels(): [string];
 
 acquistion 
 <
-	/* ctor */
+	/*
+	 * Properly boxed comment at nonzero base indent
+	 */
 	start(channel: string);
 	
 	/* forward call */
