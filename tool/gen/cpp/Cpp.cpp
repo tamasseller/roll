@@ -1,6 +1,7 @@
 #include "Cpp.h"
 #include "CppCommon.h"
 #include "CppTypeGen.h"
+#include "CppStructSerdes.h"
 
 const CodeGenCpp CodeGenCpp::instance;
 
@@ -20,6 +21,7 @@ std::string CodeGenCpp::generateClient(const std::vector<Contract>& cs) const
 	for(const auto& c: cs)
 	{
 		writeContractTypes(ss, c);
+		writeStructTypeInfo(ss, c);
 	}
 
 	return ss.str();
@@ -33,6 +35,7 @@ std::string CodeGenCpp::generateServer(const std::vector<Contract>& cs) const
 	for(const auto& c: cs)
 	{
 		writeContractTypes(ss, c);
+		writeStructTypeInfo(ss, c);
 	}
 
 	return ss.str();

@@ -20,7 +20,7 @@ struct CommonTypeGenerator
 	}
 
 	static inline std::string handleTypeRef(const std::string &n) {
-		return capitalize(n);
+		return userTypeName(n);
 	}
 
 	static inline std::string handleTypeRef(const Contract::Collection &c)
@@ -33,7 +33,7 @@ struct CommonTypeGenerator
 	static inline std::string handleTypeDef(const std::string& name, const Contract::Aggregate& a, const int n)
 	{
 		std::stringstream ss;
-		ss << indent(n) << "struct " << capitalize(name) << std::endl;
+		ss << indent(n) << "struct " << userTypeName(name) << std::endl;
 		ss << indent(n) << "{" << std::endl;
 
 		bool first = true;
@@ -53,7 +53,7 @@ struct CommonTypeGenerator
 
 			printDocs(ss, v.docs, n + 1);
 			ss << indent(n + 1) << std::visit([](const auto& i){ return handleTypeRef(i); }, v.type);
-			ss << " " << decapitalize(v.name) << ";";
+			ss << " " << aggregateMemberName(v.name) << ";";
 		}
 
 		ss << std::endl << indent(n) << "}";
@@ -64,7 +64,7 @@ struct CommonTypeGenerator
 	static inline std::string handleTypeDef(const std::string& name, const T& t, const int n)
 	{
 		std::stringstream ss;
-		ss << indent(n) << "using " << capitalize(name) << " = " << handleTypeRef(t);
+		ss << indent(n) << "using " << userTypeName(name) << " = " << handleTypeRef(t);
 		return ss.str();
 	}
 
@@ -73,7 +73,7 @@ struct CommonTypeGenerator
 	}
 
 	static inline std::array<std::string, 2> toSgnArg(const Contract::Var& a) {
-		return {decapitalize(a.name), std::visit([](const auto& t){return handleTypeRef(t);}, a.type)};
+		return {argumentName(a.name), std::visit([](const auto& t){return handleTypeRef(t);}, a.type)};
 	}
 
 	static inline std::vector<std::array<std::string, 2>> toSignArgList(const std::vector<Contract::Var>& args)
@@ -195,7 +195,7 @@ struct CommonTypeGenerator
 
 		SessionCalls scs;
 
-		ss << indent(n) << "struct " << capitalize(s.name) << std::endl;
+		ss << indent(n) << "struct " << sessionTypeName(s.name) << std::endl;
 		ss << indent(n) << "{" << std::endl;
 
 		bool first = true;
@@ -232,37 +232,12 @@ struct CommonTypeGenerator
 
 		return ss.str();
 	}
-
-	static inline void writeContractTypes(std::stringstream &ss, const Contract& c)
-	{
-		printDocs(ss, c.docs, 0);
-		ss << "struct " << capitalize(c.name) << std::endl;
-		ss << "{" << std::endl;
-
-		bool first = true;
-		for(const auto& i: c.items)
-		{
-			if(first)
-			{
-				first = false;
-			}
-			else
-			{
-				ss << std::endl;
-			}
-
-			printDocs(ss, i.first, 1);
-			ss << std::visit([](const auto& i){ return handleItem(i, 1); }, i.second) << std::endl;
-		}
-
-		ss << "};" << std::endl << std::endl;
-	}
 };
 
 void writeContractTypes(std::stringstream &ss, const Contract& c)
 {
 	printDocs(ss, c.docs, 0);
-	ss << "struct " << capitalize(c.name) << std::endl;
+	ss << "struct " << contractTypeName(c.name) << std::endl;
 	ss << "{" << std::endl;
 
 	bool first = true;

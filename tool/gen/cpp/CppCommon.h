@@ -33,6 +33,26 @@ static inline std::string decapitalize(std::string str)
 	return str;
 }
 
+static inline auto userTypeName(const std::string& n) {
+	return capitalize(n);
+}
+
+static inline auto sessionTypeName(const std::string& n) {
+	return capitalize(n);
+}
+
+static inline auto contractTypeName(const std::string& n) {
+	return capitalize(n);
+}
+
+static inline auto aggregateMemberName(const std::string& n) {
+	return decapitalize(n);
+}
+
+static inline auto argumentName(const std::string& n) {
+	return decapitalize(n);
+}
+
 static constexpr auto cbSgnTypeSuffix = "_callback_t";
 static inline auto cbSgnTypeName(const std::string& n) {
 	return decapitalize(n) + cbSgnTypeSuffix;
