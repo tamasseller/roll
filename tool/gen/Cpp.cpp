@@ -35,6 +35,41 @@ static inline std::string decapitalize(std::string str)
 	return str;
 }
 
+static constexpr auto cbSgnTypeSuffix = "_callback_t";
+static inline auto cbSgnTypeName(const std::string& n) {
+	return decapitalize(n) + cbSgnTypeSuffix;
+}
+
+static constexpr auto funSgnTypeSuffix = "_get_t";
+static inline auto funSgnTypeName(const std::string& n) {
+	return decapitalize(n) + funSgnTypeSuffix;
+}
+
+static constexpr auto actSgnTypeSuffix = "_call_t";
+static inline auto actSgnTypeName(const std::string& n) {
+	return decapitalize(n) + actSgnTypeSuffix;
+}
+
+static constexpr auto sessFwdSgnTypeSuffix = "_session_call_t";
+static inline auto sessFwdSgnTypeName(const std::string& n) {
+	return decapitalize(n) + sessFwdSgnTypeSuffix;
+}
+
+static constexpr auto sessCreateSgnTypeSuffix = "_session_create_t";
+static inline auto sessCreateSgnTypeName(const std::string& n) {
+	return decapitalize(n) + sessCreateSgnTypeSuffix;
+}
+
+static constexpr auto sessCbSgnTypeSuffix = "_session_callback_t";
+static inline auto sessCbSgnTypeName(const std::string& n) {
+	return decapitalize(n) + sessCbSgnTypeSuffix;
+}
+
+static constexpr auto sessAcceptSgnTypeSuffix = "_session_accept_t";
+static inline auto sessAcceptSgnTypeName(const std::string& n) {
+	return decapitalize(n) + sessAcceptSgnTypeSuffix;
+}
+
 void printDocs(std::stringstream &ss, const std::string& str, const int n)
 {
 	if(str.length())
@@ -107,21 +142,14 @@ struct CommonTypeGenerator
 		return ss.str();
 	}
 
-	static inline std::string handleMember(const Contract::Var& v, const int n)
+	static inline std::string handleTypeDef(const std::string& name, const Contract::Aggregate& a, const int n)
 	{
 		std::stringstream ss;
-		printDocs(ss, v.docs, n);
-		ss << indent(n) << std::visit([](const auto& i){ return handleTypeRef(i); }, v.type);
-		ss << " " << decapitalize(v.name) << ";";
-		return ss.str();
-	}
-
-	static inline std::string handleMemberList(const std::vector<Contract::Var>& vs, const int n)
-	{
-		std::stringstream ss;
+		ss << indent(n) << "struct " << capitalize(name) << std::endl;
+		ss << indent(n) << "{" << std::endl;
 
 		bool first = true;
-		for(const auto& v: vs)
+		for(const auto& v: a.members)
 		{
 			if(first)
 			{
@@ -129,22 +157,18 @@ struct CommonTypeGenerator
 			}
 			else
 			{
-				ss << std::endl;
+				if(v.docs.length())
+				{
+					ss << std::endl;
+				}
 			}
 
-			ss << handleMember(v, n) << std::endl;
+			printDocs(ss, v.docs, n + 1);
+			ss << indent(n + 1) << std::visit([](const auto& i){ return handleTypeRef(i); }, v.type);
+			ss << " " << decapitalize(v.name) << ";";
 		}
 
-		return ss.str();
-	}
-
-	static inline std::string handleTypeDef(const std::string& name, const Contract::Aggregate& a, const int n)
-	{
-		std::stringstream ss;
-		ss << indent(n) << "struct " << capitalize(name) << std::endl;
-		ss << indent(n) << "{" << std::endl;
-		ss << handleMemberList(a.members, n + 1);
-		ss << indent(n) << "}";
+		ss << std::endl << indent(n) << "}";
 		return ss.str();
 	}
 
@@ -160,7 +184,18 @@ struct CommonTypeGenerator
 		return std::visit([name{a.name}, n](const auto &t){ return handleTypeDef(name, t, n); }, a.type) + ";";
 	}
 
-	static inline std::string signature(const std::string &name, const std::vector<Contract::Var> &args, const int n)
+	static inline std::array<std::string, 2> toSgnArg(const Contract::Var& a) {
+		return {decapitalize(a.name), std::visit([](const auto& t){return handleTypeRef(t);}, a.type)};
+	}
+
+	static inline std::vector<std::array<std::string, 2>> toSignArgList(const std::vector<Contract::Var>& args)
+	{
+		std::vector<std::array<std::string, 2>> ret;
+		std::transform(args.begin(), args.end(), std::back_inserter(ret), toSgnArg);
+		return ret;
+	}
+
+	static inline std::string signature(const std::string &name, const decltype(toSignArgList({})) &args, const int n)
 	{
 		std::stringstream ss;
 		ss << indent(n) << "using " << name << " = rpc::Call";
@@ -171,19 +206,19 @@ struct CommonTypeGenerator
 		}
 		else
 		{
-			ss << " <";
+			ss << "<";
 		}
 
 		std::list<size_t> lengths;
-		std::transform(args.begin(), args.end(), std::back_inserter(lengths), [](const auto a){ return a.name.length(); });
+		std::transform(args.begin(), args.end(), std::back_inserter(lengths), [](const auto &a){ return a[0].length(); });
 		const auto width = *std::max_element(lengths.begin(), lengths.end());
 
 		for(auto i = 0u; i < args.size(); i++)
 		{
 			const auto& v = args[i];
-			const auto name = decapitalize(v.name);
+			const auto& name = v[0];
 			const auto p = width - name.length();
-			ss  << "/* " << name << std::string(p, ' ') << " */ " << std::visit([](const auto& t){return handleTypeRef(t);}, v.type);
+			ss  << "/* " << name << std::string(p, ' ') << " */ " << v[1];
 
 			if(i != args.size() - 1)
 			{
@@ -199,66 +234,39 @@ struct CommonTypeGenerator
 		return ss.str();
 	}
 
-	static constexpr auto cbSgnTypeSuffix = "_callback_t";
-	static inline auto cbSgnTypeName(const std::string& n) {
-		return decapitalize(n) + cbSgnTypeSuffix;
-	}
-
-
-	static constexpr auto funSgnTypeSuffix = "_get_t";
-	static inline auto funSgnTypeName(const std::string& n) {
-		return decapitalize(n) + funSgnTypeSuffix;
-	}
-
-	static constexpr auto actSgnTypeSuffix = "_call_t";
-	static inline auto actSgnTypeName(const std::string& n) {
-		return decapitalize(n) + actSgnTypeSuffix;
-	}
-
 	static inline std::string handleItem(const Contract::Function &f, const int n)
 	{
 		std::stringstream ss;
 		if(f.returnType)
 		{
 			std::string cbTypeName = cbSgnTypeName(f.name);
-			ss << signature(cbTypeName, {Contract::Var("ret", *f.returnType, "Value returned by " + f.name)}, n) << std::endl;
-			auto args = f.args;
-			args.push_back(Contract::Var{"callback", cbTypeName, "Callback used to return value"});
+			ss << signature(cbTypeName, {toSgnArg({"retval", *f.returnType, ""})}, n) << std::endl;
+			auto args = toSignArgList(f.args);
+			args.push_back({"callback", cbTypeName});
 			ss << signature(funSgnTypeName(f.name), args, n);
 		}
 		else
 		{
-			ss << signature(actSgnTypeName(f.name), f.args, n);
+			ss << signature(actSgnTypeName(f.name), toSignArgList(f.args), n);
 		}
 
 		return ss.str();
 	}
 
-	struct SessionCalls
-	{
-		std::vector<Contract::Var> fwd, bwd;
+	struct SessionCalls {
+		std::vector<std::array<std::string, 2>> fwd, bwd;
 	};
 
 	static inline std::string handleSessionItemInitial(SessionCalls &calls, const std::string& docs, const Contract::Session::Ctor &c, const int n) { return {}; }
-
-	static constexpr auto sessFwdSgnTypeSuffix = "_session_call_t";
-	static inline auto sessFwdSgnTypeName(const std::string& n) {
-		return decapitalize(n) + sessFwdSgnTypeSuffix;
-	}
 
 	static inline std::string handleSessionItemInitial(SessionCalls &calls, const std::string& docs, const Contract::Session::ForwardCall &f, const int n)
 	{
 		std::stringstream ss;
 		printDocs(ss, docs, n);
 		const auto typeName = sessFwdSgnTypeName(f.name);
-		ss << signature(typeName, f.args, n);
-		calls.fwd.push_back(Contract::Var(f.name, typeName, docs));
+		ss << signature(typeName, toSignArgList(f.args), n);
+		calls.fwd.push_back({f.name, typeName});
 		return ss.str();
-	}
-
-	static constexpr auto sessCbSgnTypeSuffix = "_session_callback_t";
-	static inline auto sessCbSgnTypeName(const std::string& n) {
-		return decapitalize(n) + sessCbSgnTypeSuffix;
 	}
 
 	static inline std::string handleSessionItemInitial(SessionCalls &calls, const std::string& docs, const Contract::Session::CallBack & cb, const int n)
@@ -266,19 +274,9 @@ struct CommonTypeGenerator
 		std::stringstream ss;
 		printDocs(ss, docs, n);
 		const auto typeName = sessCbSgnTypeName(cb.name);
-		ss << signature(typeName, cb.args, n);
-		calls.bwd.push_back(Contract::Var(cb.name, typeName, docs));
+		ss << signature(typeName, toSignArgList(cb.args), n);
+		calls.bwd.push_back({cb.name, typeName});
 		return ss.str();
-	}
-
-	static constexpr auto sessCreateSgnTypeSuffix = "_session_create_t";
-	static inline auto sessCreateSgnTypeName(const std::string& n) {
-		return decapitalize(n) + sessCreateSgnTypeSuffix;
-	}
-
-	static constexpr auto sessAcceptSgnTypeSuffix = "_session_accept_t";
-	static inline auto sessAcceptSgnTypeName(const std::string& n) {
-		return decapitalize(n) + sessAcceptSgnTypeSuffix;
 	}
 
 	static inline std::string handleSessionItemFinal(SessionCalls &calls, const std::string& docs, const Contract::Session::Ctor & c, const int n)
@@ -286,27 +284,22 @@ struct CommonTypeGenerator
 		std::stringstream ss;
 		printDocs(ss, docs, n);
 
-		auto fwdCallArgs = calls.bwd;
-		std::copy(c.args.begin(), c.args.end(), std::back_inserter(fwdCallArgs));
-		ss << signature(sessCreateSgnTypeName(c.name), fwdCallArgs, n) << std::endl;
+		auto fwdArgs = toSignArgList(c.args);
+		std::copy(calls.bwd.begin(), calls.bwd.end(), std::back_inserter(fwdArgs));
+		ss << signature(sessCreateSgnTypeName(c.name), fwdArgs, n) << std::endl;
 
-		auto bwdCallArgs = calls.fwd;
+		std::vector<std::array<std::string, 2>> bwdArgs;
 		if(c.returnType)
 		{
-			bwdCallArgs.push_back(Contract::Var("ret", *c.returnType, "Return value for acceptor"));
+			bwdArgs.push_back(toSgnArg({"retval", *c.returnType, ""}));
 		}
 
-		ss << signature(sessAcceptSgnTypeName(c.name), bwdCallArgs, n);
+		ss << signature(sessAcceptSgnTypeName(c.name), bwdArgs, n);
 		return ss.str();
 	}
 
-	static inline std::string handleSessionItemFinal(SessionCalls &calls, const std::string& docs, const Contract::Session::ForwardCall&, const int n) {
-		return {};
-	}
-
-	static inline std::string handleSessionItemFinal(SessionCalls &calls, const std::string& docs, const Contract::Session::CallBack&, const int n) {
-		return {};
-	}
+	static inline std::string handleSessionItemFinal(SessionCalls &calls, const std::string& docs, const Contract::Session::ForwardCall&, const int n) { return {}; }
+	static inline std::string handleSessionItemFinal(SessionCalls &calls, const std::string& docs, const Contract::Session::CallBack&, const int n) { return {}; }
 
 	static inline std::string handleItem(const Contract::Session &s, const int n)
 	{
@@ -347,7 +340,7 @@ struct CommonTypeGenerator
 			}
 		}
 
-		ss << indent(n) << "}";
+		ss << indent(n) << "};";
 
 		return ss.str();
 	}
