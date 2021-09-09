@@ -1,6 +1,6 @@
 #include "Generator.h"
 
-#include "Cpp.h"
+#include "cpp/Cpp.h"
 
 #include <map>
 #include <iostream>

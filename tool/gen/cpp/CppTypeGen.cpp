@@ -1,122 +1,10 @@
-#include "Cpp.h"
+#include "CppTypeGen.h"
+
+#include "CppCommon.h"
 
 #include <algorithm>
 #include <list>
 #include <iterator>
-
-#include <cassert>
-#include <cctype>
-
-const CodeGenCpp CodeGenCpp::instance;
-
-static constexpr auto indentStep = 4;
-
-inline std::string indent(const int n) {
-	return std::string(n * indentStep, ' ');
-}
-
-static inline std::string capitalize(std::string str)
-{
-	if(str.length())
-	{
-		str[0] = std::toupper(str[0]);
-	}
-
-	return str;
-}
-
-static inline std::string decapitalize(std::string str)
-{
-	if(str.length())
-	{
-		str[0] = std::tolower(str[0]);
-	}
-
-	return str;
-}
-
-static constexpr auto cbSgnTypeSuffix = "_callback_t";
-static inline auto cbSgnTypeName(const std::string& n) {
-	return decapitalize(n) + cbSgnTypeSuffix;
-}
-
-static constexpr auto funSgnTypeSuffix = "_get_t";
-static inline auto funSgnTypeName(const std::string& n) {
-	return decapitalize(n) + funSgnTypeSuffix;
-}
-
-static constexpr auto actSgnTypeSuffix = "_call_t";
-static inline auto actSgnTypeName(const std::string& n) {
-	return decapitalize(n) + actSgnTypeSuffix;
-}
-
-static constexpr auto sessFwdSgnTypeSuffix = "_session_call_t";
-static inline auto sessFwdSgnTypeName(const std::string& n) {
-	return decapitalize(n) + sessFwdSgnTypeSuffix;
-}
-
-static constexpr auto sessCreateSgnTypeSuffix = "_session_create_t";
-static inline auto sessCreateSgnTypeName(const std::string& n) {
-	return decapitalize(n) + sessCreateSgnTypeSuffix;
-}
-
-static constexpr auto sessCbSgnTypeSuffix = "_session_callback_t";
-static inline auto sessCbSgnTypeName(const std::string& n) {
-	return decapitalize(n) + sessCbSgnTypeSuffix;
-}
-
-static constexpr auto sessAcceptSgnTypeSuffix = "_session_accept_t";
-static inline auto sessAcceptSgnTypeName(const std::string& n) {
-	return decapitalize(n) + sessAcceptSgnTypeSuffix;
-}
-
-void printDocs(std::stringstream &ss, const std::string& str, const int n)
-{
-	if(str.length())
-	{
-		std::stringstream in(str);
-
-		std::string line;
-		bool gotLine = (bool)std::getline(in, line, '\n');
-		assert(gotLine);
-
-		bool first = true;
-		while(true)
-		{
-			if(first)
-			{
-				ss << indent(n) << "/* ";
-				first = false;
-			}
-			else if(line.length())
-			{
-				if(line[0] == '*')
-				{
-					ss << " ";
-				}
-				else
-				{
-					ss << "   ";
-				}
-			}
-
-			ss << line;
-
-			std::string next(1, '\0');
-			if(std::getline(in, next, '\n') || !(next.length() == 1 && next[0] == '\0'))
-			{
-				ss << std::endl << indent(n);
-				line = std::move(next);
-			}
-			else
-			{
-				break;
-			}
-		}
-
-		ss << " */" << std::endl;
-	}
-}
 
 struct CommonTypeGenerator
 {
@@ -345,55 +233,53 @@ struct CommonTypeGenerator
 		return ss.str();
 	}
 
-	static inline void writeTypes(std::stringstream &ss, const std::vector<Contract>& cs)
+	static inline void writeContractTypes(std::stringstream &ss, const Contract& c)
 	{
-		for(const auto& c: cs)
+		printDocs(ss, c.docs, 0);
+		ss << "struct " << capitalize(c.name) << std::endl;
+		ss << "{" << std::endl;
+
+		bool first = true;
+		for(const auto& i: c.items)
 		{
-			printDocs(ss, c.docs, 0);
-			ss << "struct " << capitalize(c.name) << std::endl;
-			ss << "{" << std::endl;
-
-			bool first = true;
-			for(const auto& i: c.items)
+			if(first)
 			{
-				if(first)
-				{
-					first = false;
-				}
-				else
-				{
-					ss << std::endl;
-				}
-
-				printDocs(ss, i.first, 1);
-				ss << std::visit([](const auto& i){ return handleItem(i, 1); }, i.second) << std::endl;
+				first = false;
+			}
+			else
+			{
+				ss << std::endl;
 			}
 
-			ss << "};" << std::endl << std::endl;
+			printDocs(ss, i.first, 1);
+			ss << std::visit([](const auto& i){ return handleItem(i, 1); }, i.second) << std::endl;
 		}
+
+		ss << "};" << std::endl << std::endl;
 	}
 };
 
-void writeHeader(std::stringstream &ss)
+void writeContractTypes(std::stringstream &ss, const Contract& c)
 {
-	ss << "#include \"RpcCall.h\"" << std::endl;
-	ss << "#include \"RpcSymbol.h\"" << std::endl;
-	ss << "#include \"RpcTypeInfo.h\"" << std::endl;
-	ss << std::endl;
-}
+	printDocs(ss, c.docs, 0);
+	ss << "struct " << capitalize(c.name) << std::endl;
+	ss << "{" << std::endl;
 
-std::string CodeGenCpp::generateClient(const std::vector<Contract>& cs) const
-{
-	std::stringstream ss;
-	writeHeader(ss);
-	CommonTypeGenerator::writeTypes(ss, cs);
-	return ss.str();
-}
+	bool first = true;
+	for(const auto& i: c.items)
+	{
+		if(first)
+		{
+			first = false;
+		}
+		else
+		{
+			ss << std::endl;
+		}
 
-std::string CodeGenCpp::generateServer(const std::vector<Contract>& cs) const
-{
-	std::stringstream ss;
-	writeHeader(ss);
-	CommonTypeGenerator::writeTypes(ss, cs);
-	return ss.str();
+		printDocs(ss, i.first, 1);
+		ss << std::visit([](const auto& i){ return CommonTypeGenerator::handleItem(i, 1); }, i.second) << std::endl;
+	}
+
+	ss << "};" << std::endl << std::endl;
 }

@@ -13,7 +13,9 @@ SOURCES += ast/ContractFormatter.cpp
 SOURCES += ast/ContractTextCodec.cpp
 
 SOURCES += gen/Generator.cpp
-SOURCES += gen/Cpp.cpp
+SOURCES += gen/cpp/Cpp.cpp
+SOURCES += gen/cpp/CppCommon.cpp
+SOURCES += gen/cpp/CppTypeGen.cpp
 
 GENDIR = .gen
 CLEAN_EXTRA += $(GENDIR)

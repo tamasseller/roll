@@ -1,7 +1,7 @@
 #ifndef RPC_TOOL_GEN_CPP_H_
 #define RPC_TOOL_GEN_CPP_H_
 
-#include "Generator.h"
+#include "../Generator.h"
 
 class CodeGenCpp: public CodeGen
 {
