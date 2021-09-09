@@ -1,10 +1,11 @@
 Lighweight Remote Procedure Calls
 =================================
 
-The solution can be split into two main functional levels:
+The solution can be split into three main functional levels:
 
  - A platform and language agnostic serialization format that enables transforming structured data to and from a byte sequence.
- - An established protocol that uses these serialized messages to implement higher level functions.
+ - An established protocol that uses these serialized messages to implement remote method invocation.
+ - An (optional) top-level transaction layer that standardizes some common session lifetime handling patterns.
 
  ```dot
 graph G
@@ -12,7 +13,7 @@ graph G
     node [shape=record, penwidth=0.5, fontcolor="dimgray",style=filled,fillcolor="#eeeeee", fontname="mono", fontsize=12, width=2];
     edge [color="dimgray"];
     app[label="Application"]
-    rpc[shape=record, label="{RPC protocol|Serialization \nsublayer}", penwidth=1, fontcolor="",fillcolor="palegoldenrod"]
+    rpc[shape=record, label="{Transaction\nlayer|RPC protocol|Serialization \nsublayer}", penwidth=1, fontcolor="",fillcolor="palegoldenrod"]
     tcp[label="{Message\ntransport\nadapter|Byte stream \ntransport}"]
     udp[label="{Message\ntransport\nadapter|Datagram \ntransport}"]
 
@@ -25,9 +26,9 @@ graph G
  Serialization
  -------------
 
- The serialization part of the solution utilizes a strongly typed data representation, meaning that it defines an abstract (language independent) data type system where each message has an associated type that defines its logical structure and the corresponding serialization rules.
+ The part of the solution that is responsible for serialization utilizes a strongly typed data representation. It defines an abstract (source language independent) data type system where each message has an associated type that defines its logical structure and the corresponding serialization rules.
 
- The structure of the data is represented at the endpoints in a source language specific way, that can be different on each end. Only the serialization type system needs to harmonized with the supported source languages not each of language with all others.
+ The structure of the data is represented at the endpoints in a source language specific way, that can be different on each end of a connection and an abstract data type may have multiple possible source language counterparts. This means that only the serialization type system needs to harmonized with the supported source languages not each language with all of the others.
 
  ```dot
  digraph G
@@ -45,11 +46,11 @@ graph G
  }
  ```
 
- Messages can only be (de)serialized knowing their type, in other words the messages are not self-describing. The purpose of this serialization format is to serve the needs of the RPC protocol, ergo the messages are not meant to be processed out of context. It has obvious performance benefits to spare the extra resources that could be used to send meta-information already known by the intended target.
+ Messages can only be (de)serialized knowing their type - in other words - the messages themselves are not self-describing. The purpose of this serialization format is to serve the needs of the RPC protocol, the messages are not meant to be processable out of context. It has obvious performance benefits to spare the extra resources that could be used to send meta-information that must already be known by the intended target (i.e. the contract).
 
 ### Type system
 
-All types can be represented as a tree, whose nodes can be aggregates, collections, typed method handles or primitive types (at the leaves only).
+All types in the abstract type system can be represented as a tree, whose nodes can be aggregates, collections, typed method handles or primitive types (at the leaves only).
 
 #### Nodes
 
@@ -66,7 +67,7 @@ There are eight integral primitives, representing signed/unsigned integral value
 
 ##### Aggregates 
 
-An aggregate is a compund data record consisting of a list of values with predefined types and order between them. It is similar to a C/C++/C# _struct_.
+An aggregate is a compund data record consisting of a list of values with predefined types and order between them. It serves the same purpose as (and can be mapped to) a C/C++/C# _struct_ or similar language construct in other languages.
 
 The aggregate type-node can have zero or more children.
 
@@ -78,7 +79,7 @@ The collection type-node has exactly one child.
 
 ##### Method handle
 
-A method handle is a type that has associated children type-nodes that represent the arguments of a function call. Contrary to the aggregate, the value it represents is not the arguments themselves but a handle that can be used to invoke a method that takes exactly those arguments.
+A method handle is a type that has associated children type-nodes that represent the arguments of a function call. Contrary to the aggregate, the value it represents is not the values of the children themselves but a single handle that can be used to invoke a method that takes exactly those arguments.
 
 The method type-node can have zero or more children.
 
@@ -109,13 +110,13 @@ For example **[i1]** is the signature of a collection of one byte signed integer
 
 ##### Method handle
 
-The signature of a method handle is the type signature of the arguments types (in order), separated by a comma **,**  (without whitespace on either side) between parentheses (round brackets).
+The signature of a method handle is the type signature of the arguments' types (in order), separated by a comma **,**  (without whitespace on either side) between parentheses (round brackets).
 
 For example **(u4, [i1])** is the signature of a handle for a method that takes a four byte unsigned integer and collection of signed single bytes - in that order.
 
 #### Encoding
 
-The serialized encoding of a value is determined by its type. The overall structure of the byte sequence corresponding to a value can be understood as being generated by a depth-first traversal of the type tree.
+The serializiation and deserialization process of a value is generated by a depth-first traversal of its type tree. When encountering a node during the traversal the apropriate coding step generates/consumes raw data in a sequential manner.
 
 ##### Integral primitives
 
@@ -125,7 +126,7 @@ _An additional requirement for efficeint CPU acces would be aligned base address
 
 ##### Aggregates 
 
-Aggregate typed values are serialized as a sequence of its constituent member values - in order, without any additional framing.
+The aggregate nodes do not have explicit encoding. Aggregate values are serialized as a sequence of their constituent member values - in order, without no additional framing before, between or after the members.
 
 ##### Variable length encoding
 
@@ -158,7 +159,7 @@ Method handles are unsigned 32-bit values used by the upper protocol layer as an
 
 #### Example
 
-A method that takes a set of number to string mappings, and returns string to number mappings via a callback could be represented by this signature: 
+A method that takes a bunch of number-string pairs, and returns string-number pairs via a callback could be represented by this signature: 
 
       ([{u8,[i1]}],([{[i1],u8}]))
 
@@ -200,7 +201,7 @@ Type-nodes in the figure are color coded based on their kind:
  - Yellow means collection,
  - The rest are integral primitives.
 
-A value of this type is a 32-bit unsigned integral which is encoded using the variable length encoding scheme.
+A value of this type is a 32-bit unsigned integral which is encoded using the variable length encoding scheme if transfered.
 
 However if a method with the this signature is invoked its arguments are serialized as an aggregate of the arguments, like this:
 
@@ -245,7 +246,7 @@ The data used in the invocation of the callback has the following byte sequence 
 Protocol
 --------
 
-The RPC protocol is defined in terms of endpoint state and interactions with the application and the remote endpoint.
+The RPC protocol can be defined in terms of endpoint state and interactions with the application and the remote endpoint.
 
 The direction of connection establishment is irrelevant, the two ends of the connection function in exactly the same way.
 
@@ -272,19 +273,21 @@ The operation can be further divided in two logical layers:
  - Signature based symbolic method lookup (or linking).
 
 ```ditaa {cmd=true args=["-E","-S"]}
-+----------------------------------------+
-|                                    cDDD|
-|               Application              |
-|                                        |
-+-------------------------+              |
-|   Symbolic linking cGRE |              |
-+-------------------------+-----+        |
-|   Remote invocation layer cYEL|        |
-+-------------------------------+        |
-|   Serialization           cPNK|        |
-+-------------------------------+--------+    
-|   Message transport adapter        cDDD|
-+----------------------------------------+
++----------------------------------------------+
+|                                         cDDD |
+|                  Application                 |
+|                                              |
++----------------------------+                 |
+|  (Transaction layer)  c88F |                 |
++----------------------------+---+             |
+|   Symbolic linking       cGRE  |             |
++--------------------------------+----+        |
+|   Remote invocation layer cYEL      |        |
++-------------------------------------+        |
+|   Serialization                cPNK |        |
++-------------------------------------+--------+    
+|   Message transport adapter        cDDD      |
++----------------------------------------------+
 ```
 
 ### Remote procedure invocation layer
@@ -301,7 +304,7 @@ For each registered method there is a 32-bit unsigned numeric value that identif
 
 Every message exchanged by the endpoints follows the same format and has the same effect as far as the invocation layer is concerned. Each message triggers the execution of a registered method at the receiving end. It contains the identifier for the method to be invoked at the receiver. The identifier is a key in the registry of of methods, so it either has to:
 
- - identify a well-known method or
+ - identify a pre-arranged or well-known method or
  - be retrieved earlier from the remote endpoint.
 
 The identifier of the method is the first item in the message followed by the arguments to be used for the invocation. These values are serialized as if they were an aggregate of a method handle and all the arguments of the method, formally it has the type signature:
@@ -324,27 +327,27 @@ The appliction is provided with the following operations regarding basic remote 
 
 ### Symbolic method lookup
 
-Type safety can be achieved by utilizing method signature based symbolic method lookup. The signature of a public method consists of a textual name and the type signature of a handle to that method.
+Cross-source-language type safety can be achieved by utilizing method signature based symbolic method lookup. The signature of a public method consists of a textual name and the type signature of a handle to that method.
 
 For example a method named _foo_ receiving a list of strings has a signature:
 
     foo([[i1]])
 
-_In order for an application to be able to utilize some remotely provided functionality it must known the semantics of that service, including the relevant structure of the data to be sent during invocation of remote methods. Thus, it can be assumed that it is able to issue fully qualified method signatures as a basis for looking up remote methods. It is also valid a assumption the other way around: the public interface of service can only be specified in terms of well defined data structures._
+_In order for an application to be able to utilize some remotely provided functionality it must known the semantics of that service, including the relevant structure of the data to be sent during invocation of remote methods. Thus, it can be assumed that it is able to issue request using fully qualified method signatures as a basis for looking up remote methods. It is also valid a assumption the other way around: the public interface of service can only be specified in terms of well defined data structures._
 
-To achieve type safety, it is enough for both ends to adhere to the proper data handling procedures waranted by the signature of interface methods.
+To achieve type safety at the abstract level, it is enough for both ends to adhere to the proper data handling procedures waranted by the signature of interface methods.
 
 #### Related endpoint state
 
-Exported procedures must be available for remotely triggered execution as well, so they must be registered at the invocation layer. Thus, all publicly available methods bear a valid identifier assigned to them as well. In addition to that, the endpoint stores the published methods available for lookup. The registry required for this is equivalent of a mapping from method signature to invocation identifier.
+The endpoint manages a registry of published methods available for lookup using method signature. Exported procedures must be available for remotely triggered execution as well, so they must be also registered at the invocation layer. Thus, all publicly available methods bear a valid identifier assigned to them as well. 
 
 #### Protocol messages
 
-A public method can be looked up via a proper remote call, registered with a well-known identifier 0. This is the _lookup_ method, although not needed to be registered as a public method it has the theoretical signature:
+A public method can be looked up via a proper remote call, registered with a **well-known identifier 0**. This is the _lookup_ method, although not needed to be registered as a public method. It has the theoretical signature:
 
-    lookup([i1],(u4))
+    lookup(u8,(u4))
 
-The _lookup_ procedure tries to find the published method whose signature is passed to it as the first argument and provides the result in the form of a callback issued to the method identified by its second argument. If the lookup was succesful it passes back the identifier corresponding to the requested symbol as a normal unsigned 32-bit value to the callback as its first and only argument. In case of an error it return the maximal value of a 32-bit unsigned integer (0xffffffff or -1u).
+The _lookup_ procedure looks for a published method whose signature has a corresponding FNV-1a hash (64bit variant) value that matches its first argument and provides the result in the form of a callback issued to the method identified by its second argument. If the lookup was succesful it passes the identifier corresponding to the requested symbol as a normal unsigned 32-bit value to the callback as its first and only argument. In case of failure it return the maximal value of a 32-bit unsigned integer (0xffffffff or -1u).
 
 #### Application interface
 
@@ -353,6 +356,11 @@ The appliction is provided with the following operations regarding signature bas
  - **provide** a local method as the definition of a symbol,
  - **discard** the previously provided method for a specific symbol,
  - **lookup** the handle for a symbol provided by the remote application at the remote RPC endpoint.
+
+Transaction Layer
+-----------------
+
+**TBD**
 
 Message Transport Adapters
 --------------------------

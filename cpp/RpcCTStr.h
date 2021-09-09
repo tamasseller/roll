@@ -2,6 +2,7 @@
 #define _RPCCTSTR_H_
 
 #include <stddef.h>
+#include <stdint.h>
 
 namespace rpc {
 
@@ -41,6 +42,27 @@ public:
 
     constexpr operator const char *() const { return data; }
     constexpr size_t size() const { return size; }
+
+	/*
+	 * FNV-1a hash of the string **including null-terminator**.
+	 *
+	 * https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
+	 */
+    constexpr size_t hash() const
+    {
+    	const uint64_t offset = uint64_t(14695981039346656037u);
+		const uint64_t prime = uint64_t(1099511628211u);
+
+		uint64_t result = offset;
+
+		for(char c: data)
+		{
+			result ^= c;
+			result *= prime;
+		}
+
+		return result;
+    }
 
     template<size_t oLen>
     constexpr bool operator ==(const CTStr<oLen>&o) const 

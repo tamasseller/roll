@@ -33,7 +33,6 @@ namespace detail
 template <
 	template<class> class Pointer,
 	template<class, class> class Registry,
-	class NameRegistry,
 	class InputAccessor,
 	class IoEngine
 >
@@ -42,19 +41,27 @@ class Endpoint:
 		InputAccessor,
 		Pointer, 
 		Registry, 
-		Endpoint<Pointer, Registry, NameRegistry, InputAccessor, IoEngine>&>,
-	NameRegistry
+		Endpoint<Pointer, Registry, InputAccessor, IoEngine>&
+	>
 {
 	using CallId = typename Endpoint::Core::CallId;
 
-	const char* doLookup(const char* name, size_t length, CallId cb)
+	Registry<decltype(""_ctstr.hash()), CallId> symbolRegistry;
+
+	const char* doLookup(uint64_t id, size_t length, CallId cb)
 	{
 		bool buildOk;
 
 		auto f = static_cast<IoEngine*>(this)->messageFactory();
 
-		auto data = this->Endpoint::Core::template buildCall<ArrayWriter<char>, Call<CallId>>(
-			f, buildOk, lookupId, ArrayWriter<char>(name, length), Call<CallId>{cb});
+		auto data = this->Endpoint::Core::template buildCall<uint64_t, Call<CallId>>
+		(
+			f,
+			buildOk,
+			lookupId,
+			id,
+			Call<CallId>{cb}
+		);
 
 		if(buildOk)
 		{
@@ -77,22 +84,27 @@ public:
 	 */
 	bool init()
 	{
-		return this->Endpoint::Core::template addCallAt<StreamReader<char, InputAccessor>, Call<CallId>>(lookupId, []
-		(Endpoint& ep, const MethodHandle &id, StreamReader<char, InputAccessor> name, Call<CallId> callback)
+		return this->Endpoint::Core::template addCallAt<uint64_t, Call<CallId>>(lookupId,
+		[](Endpoint& ep, const MethodHandle &id, uint64_t idHash, Call<CallId> callback)
 		{
-			auto nameQuery = ep.NameRegistry::beginQuery();
-
-			for(char c: name)
-				nameQuery << c;
-
-			CallId result = invalidId;
+			CallId r = invalidId;
 			const char* ret = nullptr;
 
-			if(!nameQuery.run(ep, result))
+			bool ok;
+			auto result = ep.symbolRegistry.find(idHash, ok);
+			if(ok)
+			{
+				r = *result;
+			}
+			else
+			{
 				ret = Errors::unknownMethodRequested;
+			}
 
-			if(auto err = ep.call(callback, result))
-				return err;
+			if(auto err = ep.call(callback, r))
+			{
+				ret = err;
+			}
 
 			return ret;
 		});
@@ -119,8 +131,8 @@ public:
 	 * 
 	 * The registration created this way is not public in the sense that it 
 	 * can not be looked up by the remote end using a name. However it can 
-	 * be used for callbacks by sending the returned handle over to the 
-	 * remote end that can use it later to invoke the registered method.
+	 * be used to implements a callback by sending the returned handle over
+	 * to the remote end that can use it later to invoke the registered method.
 	 * 
 	 * The argument must be a functor object that accepts the following arguments:
 	 * 
@@ -128,7 +140,7 @@ public:
 	 *   - second: an rpc::MethodHandle opaque identifier that can be used to remove the
 	 *     registration (for example via the reference to the Endpoint object in the first 
 	 *     argument) during execution of the method itself,
-	 *   - the rest of the arguments are the ones received from the remote call the types of which are
+	 *   - the rest of the arguments are the ones received from the remote call, the types of which are
 	 *     captured in the returned Call object.
 	 * 
 	 * Returns a Call method handle that can be used to execute the registered method.
@@ -142,15 +154,15 @@ public:
 
 	/**
 	 * Removes a method registration identified by an opaque handle supplied to the 
-	 * method at invocation.
+	 * method at its invocation by the RPC engine.
 	 * 
+	 * NOTE: a public method must not be **uninstalled** this way, but it needs to be **discarded**
+	 *       using its symbol instead.
+	 *
 	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
 	 */
 	inline const char* uninstall(const rpc::MethodHandle &h)
 	{
-		auto &nameReg = *((NameRegistry*)this);
-		nameReg.removeMapping(h.id);
-
 		auto &core = *((typename Endpoint::Core*)this);
 
 		if(!core.removeCall(h.id))
@@ -171,7 +183,7 @@ public:
 	}
 
 	/**
-	 * Initiates a remote method call with the supplied parameters.
+	 * Initiate a remote method call with the supplied parameters.
 	 * 
 	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
 	 * The possible errors include:
@@ -215,15 +227,19 @@ public:
 	{
 		Call<Args...> id = this->install(rpc::forward<C>(c));
 		
-		auto &nameReg = *((NameRegistry*)this);
-		if(nameReg.addMapping((const char*)sym, id.id))
-			return nullptr;
-		
-		auto &core = *((typename Endpoint::Core*)this);
-		if(!core.removeCall(id.id))
-			return Errors::internalError; // GCOV_EXCL_LINE
-		
-		return Errors::symbolAlreadyExported;
+		if(!symbolRegistry.add(sym.hash(), rpc::move(id.id)))
+		{
+			auto &core = *((typename Endpoint::Core*)this);
+
+			if(!core.removeCall(id.id))
+			{
+				return Errors::internalError; // GCOV_EXCL_LINE
+			}
+
+			return Errors::symbolAlreadyExported;
+		}
+
+		return nullptr;
 	}
 
 	/**
@@ -238,15 +254,21 @@ public:
 	template<size_t n, class... Args>
 	inline const char* discard(const Symbol<n, Args...> &sym)
 	{
-		CallId id;
-		
-		auto &nameReg = *((NameRegistry*)this);
-		if(!nameReg.removeMapping((const char*)sym, id))
+		const auto idHash = sym.hash();
+
+		bool ok;
+		auto result = symbolRegistry.find(idHash, ok);
+
+		if(!ok)
+		{
 			return Errors::noSuchSymbol;
+		}
 
 		auto &core = *((typename Endpoint::Core*)this);
-		if(!core.removeCall(id))
+		if(!symbolRegistry.remove(idHash) || !core.removeCall(*result))
+		{
 			return Errors::internalError; // GCOV_EXCL_LINE
+		}
 		
 		return nullptr;
 	}
@@ -283,7 +305,7 @@ public:
 			return (const char*) nullptr;
 		});
 
-		if(auto err = doLookup((const char*)sym, n, id))
+		if(auto err = doLookup(sym.hash(), n, id))
 		{
 			if(!core.removeCall(id))
 				return Errors::internalError; // GCOV_EXCL_LINE

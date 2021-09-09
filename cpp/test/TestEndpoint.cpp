@@ -15,76 +15,10 @@
 #include <list>
 #include <sstream>
 
-struct MockMethodDictionary
-{
-    std::map<std::string, uint32_t> dict;
-
-    class Query: std::stringstream
-    {
-        decltype(dict)& d;
-
-        friend MockMethodDictionary;
-        Query(decltype(dict)& d): d(d) {}
-
-    public:
-        auto &operator<<(char c) {
-            return *((std::stringstream*)this) << c;
-        }
-
-        bool run(MockMethodDictionary&, uint32_t &result) 
-        {
-            auto it = d.find(this->str());
-
-            if(it == d.end())
-                return false;
-
-            result = it->second;
-            return true;
-        }
-    };
-
-    auto beginQuery() {
-        return Query(dict);
-    }
-
-    bool addMapping(const char* name, uint32_t value) {
-        return dict.insert({name, value}).second;
-    }
-
-    bool removeMapping(const char* name, uint32_t &value) 
-    {
-        auto it = dict.find(name);
-
-        if(it != dict.end())
-        {
-            value = it->second;
-            dict.erase(it);
-            return true;
-        }
-
-        return false;
-    }
-
-    bool removeMapping(uint32_t value) 
-    {
-        for(auto it = dict.begin(); it != dict.end(); it++)
-        {
-            if(it->second == value)
-            {
-                dict.erase(it);
-                return true;
-            }
-        }
-
-        return false;
-    }
-};
-
 struct Uut:
 		rpc::Endpoint<
 			MockSmartPointer,
 			MockRegistry,
-			MockMethodDictionary,
 			MockStreamWriterFactory::Accessor,
 			Uut
 		>
@@ -196,45 +130,6 @@ TEST(Endpoint, ProvideDiscardRequire)
     CHECK(uut.discard(sym) == rpc::Errors::noSuchSymbol);
 
     CHECK(done);
-}
-
-TEST(Endpoint, ProvideRequireRemovedFromCall)
-{
-    Uut uut;
-    CHECK(uut.init());
-
-    constexpr auto sym = rpc::symbol<>("symbol"_ctstr);
-    CHECK(nullptr == uut.provide(sym, [](Uut::Endpoint& uut, const rpc::MethodHandle &id) {
-        uut.uninstall(id);
-    }));
-   
-    bool done1 = false;
-    CHECK(nullptr == uut.lookup(sym, [&done1](Uut::Endpoint& uut, bool lookupSucced, auto result)
-    {
-        CHECK(lookupSucced);
-        CHECK(nullptr == uut.call(result));
-        done1 = true;
-    }));
-
-    for(int i = 0; i < 2; i++)
-        executeLoopback(uut);
-
-    CHECK(done1);
-
-    executeLoopback(uut);
-    CHECK(uut.discard(sym) == rpc::Errors::noSuchSymbol);
-
-    bool done2 = false;
-    CHECK(nullptr == uut.lookup(sym, [&done2](Uut::Endpoint& uut, bool lookupSucced, auto)
-    {
-        CHECK(!lookupSucced);
-        done2 = true;
-    }));
-
-    executeLoopback(uut, rpc::Errors::unknownMethodRequested);
-    executeLoopback(uut);
-
-    CHECK(done2);
 }
 
 TEST(Endpoint, DoubleProvide)

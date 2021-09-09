@@ -4,6 +4,23 @@
 
 #include <string>
 
+/*
+ * Test vectors from:
+ *
+ * 	 Appendix C of "The FNV Non-Cryptographic Hash Algorithm"
+ *   https://datatracker.ietf.org/doc/html/draft-eastlake-fnv-17#page-114
+ */
+static_assert(""_ctstr.hash() == 0xaf63bd4c8601b7dfull);
+static_assert("a"_ctstr.hash() == 0x089be207b544f1e4ull);
+static_assert("foobar"_ctstr.hash() == 0x34531ca7168b8f38ull);
+
+/*
+ * Some plausible signatures.
+ */
+static_assert("lookup([u8])"_ctstr.hash() == 0xb9d820635b0a84cb);
+static_assert("get([i1], ([i1]))"_ctstr.hash() == 0x28ecc5d629430cefull);
+static_assert("complicated(u4,(u4,[[i1]]),(()))"_ctstr.hash() == 0xe259accc6c04a22ull);
+
 TEST_GROUP(String) 
 {
     struct Worker1 {

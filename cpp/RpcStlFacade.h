@@ -38,7 +38,6 @@ class StlFacade:
 	public Endpoint<
 		detail::StlAutoPointer,
 		detail::HashMapRegistry,
-		detail::HashMapBasedNameDictionary,
 		typename Io::InputAccessor,
 		Child
 	>
