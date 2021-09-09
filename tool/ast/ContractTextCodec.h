@@ -5,7 +5,7 @@
 #include <iosfwd>
 #include <string>
 
-std::vector<Contract> deserialize(std::istream &input);
-std::string serialize(const std::vector<Contract>& ast);
+std::vector<Contract> deserializeText(std::istream &input);
+std::string serializeText(const std::vector<Contract>& ast);
 
 #endif /* RPC_TOOL_ASTRANSMODEL_H_ */

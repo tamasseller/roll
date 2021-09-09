@@ -10,7 +10,7 @@ SOURCES += CodeGen.cpp
 
 SOURCES += ast/ContractParser.cpp
 SOURCES += ast/ContractFormatter.cpp
-SOURCES += ast/ContractRansSerDesCodec.cpp
+SOURCES += ast/ContractTextCodec.cpp
 
 SOURCES += gen/Generator.cpp
 SOURCES += gen/Cpp.cpp

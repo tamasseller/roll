@@ -1,5 +1,5 @@
 #include "ast/ContractParser.h"
-#include "ast/ContractRansSerDesCodec.h"
+#include "ast/ContractTextCodec.h"
 
 #include "InputOptions.h"
 #include "OutputOptions.h"
@@ -19,10 +19,10 @@ CLI_APP(serialize, "Convert descriptor to dense binary format")
 	if(this->processCommandLine())
 	{
 		auto ast = parse(*opts.input);
-		auto data = serialize(ast);
+		auto data = serializeText(ast);
 
 		std::istringstream is(data, std::ios::binary | std::ios::in);
-		auto rec = deserialize(is);
+		auto rec = deserializeText(is);
 
 		auto it = rec.begin();
 		for(const auto& c: ast)

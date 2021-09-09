@@ -1,5 +1,5 @@
 #include "ContractParser.h"
-#include "ContractRansSerDesCodec.h"
+#include "ContractTextCodec.h"
 
 #include "Taboo.h"
 
@@ -275,6 +275,6 @@ std::vector<Contract> parse(std::istream& is)
 	}
 	else
 	{
-		return deserialize(is);
+		return deserializeText(is);
 	}
 }
