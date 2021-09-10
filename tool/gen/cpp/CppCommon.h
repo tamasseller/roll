@@ -7,85 +7,100 @@
 #include <cassert>
 #include <cctype>
 
-static constexpr auto indentStep = 4;
+namespace detail
+{
+	static constexpr auto indentStep = 4;
+	static constexpr auto symPrefix = "sym";
+	static constexpr auto typeNsSuffix = "Types";
+	static constexpr auto symNsSuffix = "Symbols";
+	static constexpr auto actSgnTypeSuffix = "Call";
+	static constexpr auto funSgnTypeSuffix = "Function";
+	static constexpr auto cbSgnTypeSuffix = "Callback";
+	static constexpr auto sessNsSuffix = "Session";
+	static constexpr auto sessFwdSgnTypeSuffix = "Call";
+	static constexpr auto sessCbSgnTypeSuffix = "Callback";
+	static constexpr auto sessCreateSgnTypeSuffix = "Create";
+	static constexpr auto sessAcceptSgnTypeSuffix = "Accept";
+
+	static inline std::string capitalize(std::string str)
+	{
+		if(str.length())
+		{
+			str[0] = std::toupper(str[0]);
+		}
+
+		return str;
+	}
+
+	static inline std::string decapitalize(std::string str)
+	{
+		if(str.length())
+		{
+			str[0] = std::tolower(str[0]);
+		}
+
+		return str;
+	}
+}
 
 inline std::string indent(const int n) {
-	return std::string(n * indentStep, ' ');
-}
-
-static inline std::string capitalize(std::string str)
-{
-	if(str.length())
-	{
-		str[0] = std::toupper(str[0]);
-	}
-
-	return str;
-}
-
-static inline std::string decapitalize(std::string str)
-{
-	if(str.length())
-	{
-		str[0] = std::tolower(str[0]);
-	}
-
-	return str;
-}
-
-static inline auto userTypeName(const std::string& n) {
-	return capitalize(n);
-}
-
-static inline auto sessionTypeName(const std::string& n) {
-	return capitalize(n);
-}
-
-static inline auto contractTypeName(const std::string& n) {
-	return capitalize(n);
+	return std::string(n * detail::indentStep, ' ');
 }
 
 static inline auto aggregateMemberName(const std::string& n) {
-	return decapitalize(n);
+	return detail::decapitalize(n);
 }
 
 static inline auto argumentName(const std::string& n) {
-	return decapitalize(n);
+	return detail::decapitalize(n);
 }
 
-static constexpr auto cbSgnTypeSuffix = "_callback_t";
-static inline auto cbSgnTypeName(const std::string& n) {
-	return decapitalize(n) + cbSgnTypeSuffix;
+static inline auto contractTypesNamespaceName(const std::string& n) {
+	return detail::capitalize(n) + detail::typeNsSuffix;
 }
 
-static constexpr auto funSgnTypeSuffix = "_get_t";
-static inline auto funSgnTypeName(const std::string& n) {
-	return decapitalize(n) + funSgnTypeSuffix;
+static inline auto contractSymbolsNamespaceName(const std::string& n) {
+	return detail::capitalize(n) + detail::symNsSuffix;
 }
 
-static constexpr auto actSgnTypeSuffix = "_call_t";
-static inline auto actSgnTypeName(const std::string& n) {
-	return decapitalize(n) + actSgnTypeSuffix;
+static inline auto userTypeName(const std::string& n) {
+	return detail::capitalize(n);
 }
 
-static constexpr auto sessFwdSgnTypeSuffix = "_session_call_t";
-static inline auto sessFwdSgnTypeName(const std::string& n) {
-	return decapitalize(n) + sessFwdSgnTypeSuffix;
+static inline auto symbolName(const std::string& n) {
+	return detail::symPrefix + detail::capitalize(n);
 }
 
-static constexpr auto sessCreateSgnTypeSuffix = "_session_create_t";
-static inline auto sessCreateSgnTypeName(const std::string& n) {
-	return decapitalize(n) + sessCreateSgnTypeSuffix;
+static inline auto actionSignatureTypeName(const std::string& n) {
+	return detail::capitalize(n) + detail::actSgnTypeSuffix;
 }
 
-static constexpr auto sessCbSgnTypeSuffix = "_session_callback_t";
-static inline auto sessCbSgnTypeName(const std::string& n) {
-	return decapitalize(n) + sessCbSgnTypeSuffix;
+static inline auto functionSignatureTypeName(const std::string& n) {
+	return detail::capitalize(n) + detail::funSgnTypeSuffix;
 }
 
-static constexpr auto sessAcceptSgnTypeSuffix = "_session_accept_t";
-static inline auto sessAcceptSgnTypeName(const std::string& n) {
-	return decapitalize(n) + sessAcceptSgnTypeSuffix;
+static inline auto callbackSignatureTypeName(const std::string& n) {
+	return detail::capitalize(n) + detail::cbSgnTypeSuffix;
+}
+
+static inline auto sessionNamespaceName(const std::string& n) {
+	return detail::capitalize(n) + detail::sessNsSuffix;
+}
+
+static inline auto sessionForwardCallSignatureTypeName(const std::string& n) {
+	return detail::capitalize(n) + detail::sessFwdSgnTypeSuffix;
+}
+
+static inline auto sessionCallbackSignatureTypeName(const std::string& n) {
+	return detail::capitalize(n) + detail::sessCbSgnTypeSuffix;
+}
+
+static inline auto sessionCreateSignatureTypeName(const std::string& n) {
+	return detail::capitalize(n) + detail::sessCreateSgnTypeSuffix;
+}
+
+static inline auto sessionAcceptSignatureTypeName(const std::string& n) {
+	return detail::capitalize(n) + detail::sessAcceptSgnTypeSuffix;
 }
 
 void printDocs(std::stringstream &ss, const std::string& str, const int n);

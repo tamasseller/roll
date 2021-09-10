@@ -88,8 +88,8 @@ HostInfo =
 	names: [Str]
 };
 
-/* Discovery session*/
-session
+/* Neighbor discovery session*/
+scan
 <
 	/* Start discovery process with specified query identifier */
 	start(queryId: u4): HostInfo;

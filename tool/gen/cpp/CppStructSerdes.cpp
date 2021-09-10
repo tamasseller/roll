@@ -14,7 +14,7 @@ struct StructTypeInfoGenerator
 			ss << "," << std::endl << indent(n + 1) << "StructMember<&" << name << "::" << m.name << ">";
 		}
 
-		ss << std::endl << indent(n) << ">;" << std::endl;
+		ss << std::endl << indent(n) << "> {};" << std::endl;
 		return ss.str();
 	}
 
@@ -22,7 +22,7 @@ struct StructTypeInfoGenerator
 	static inline std::string handleTypeDef(const std::string& name, const T& t, const int n) { return {}; }
 
 	static inline std::string handleItem(const std::string& contractName, const Contract::Alias &a, const int n) {
-		return std::visit([name{contractTypeName(contractName) + "::" + userTypeName(a.name)}, n](const auto &t){ return handleTypeDef(name, t, n); }, a.type);
+		return std::visit([name{contractTypesNamespaceName(contractName) + "::" + userTypeName(a.name)}, n](const auto &t){ return handleTypeDef(name, t, n); }, a.type);
 	}
 
 	template<class C> static inline std::string handleItem(const std::string&, const C&, const int n) { return {}; }
@@ -30,9 +30,6 @@ struct StructTypeInfoGenerator
 
 void writeStructTypeInfo(std::stringstream &ss, const Contract& c)
 {
-	ss << "namespace rpc" << std::endl;
-	ss << "{" << std::endl;
-
 	bool first = true;
 	for(const auto& i: c.items)
 	{
@@ -43,6 +40,8 @@ void writeStructTypeInfo(std::stringstream &ss, const Contract& c)
 			if(first)
 			{
 				first = false;
+				ss << "namespace rpc" << std::endl;
+				ss << "{" << std::endl;
 			}
 			else
 			{
@@ -53,5 +52,8 @@ void writeStructTypeInfo(std::stringstream &ss, const Contract& c)
 		ss << str;
 	}
 
-	ss << "};" << std::endl << std::endl;
+	if(!first)
+	{
+		ss << "};" << std::endl << std::endl;
+	}
 }

@@ -53,10 +53,10 @@ struct CommonTypeGenerator
 
 			printDocs(ss, v.docs, n + 1);
 			ss << indent(n + 1) << std::visit([](const auto& i){ return handleTypeRef(i); }, v.type);
-			ss << " " << aggregateMemberName(v.name) << ";";
+			ss << " " << aggregateMemberName(v.name) << ";" << std::endl;
 		}
 
-		ss << std::endl << indent(n) << "}";
+		ss << indent(n) << "}";
 		return ss.str();
 	}
 
@@ -127,15 +127,17 @@ struct CommonTypeGenerator
 		std::stringstream ss;
 		if(f.returnType)
 		{
-			std::string cbTypeName = cbSgnTypeName(f.name);
+			std::string cbTypeName = callbackSignatureTypeName(f.name);
 			ss << signature(cbTypeName, {toSgnArg({"retval", *f.returnType, ""})}, n) << std::endl;
 			auto args = toSignArgList(f.args);
 			args.push_back({"callback", cbTypeName});
-			ss << signature(funSgnTypeName(f.name), args, n);
+			const auto type = functionSignatureTypeName(f.name);
+			ss << signature(type, args, n);
 		}
 		else
 		{
-			ss << signature(actSgnTypeName(f.name), toSignArgList(f.args), n);
+			const auto type = actionSignatureTypeName(f.name);
+			ss << signature(type, toSignArgList(f.args), n);
 		}
 
 		return ss.str();
@@ -151,7 +153,7 @@ struct CommonTypeGenerator
 	{
 		std::stringstream ss;
 		printDocs(ss, docs, n);
-		const auto typeName = sessFwdSgnTypeName(f.name);
+		const auto typeName = sessionForwardCallSignatureTypeName(f.name);
 		ss << signature(typeName, toSignArgList(f.args), n);
 		calls.fwd.push_back({f.name, typeName});
 		return ss.str();
@@ -161,7 +163,7 @@ struct CommonTypeGenerator
 	{
 		std::stringstream ss;
 		printDocs(ss, docs, n);
-		const auto typeName = sessCbSgnTypeName(cb.name);
+		const auto typeName = sessionCallbackSignatureTypeName(cb.name);
 		ss << signature(typeName, toSignArgList(cb.args), n);
 		calls.bwd.push_back({cb.name, typeName});
 		return ss.str();
@@ -174,7 +176,7 @@ struct CommonTypeGenerator
 
 		auto fwdArgs = toSignArgList(c.args);
 		std::copy(calls.bwd.begin(), calls.bwd.end(), std::back_inserter(fwdArgs));
-		ss << signature(sessCreateSgnTypeName(c.name), fwdArgs, n) << std::endl;
+		ss << signature(sessionCreateSignatureTypeName(c.name), fwdArgs, n) << std::endl;
 
 		std::vector<std::array<std::string, 2>> bwdArgs;
 		if(c.returnType)
@@ -182,7 +184,7 @@ struct CommonTypeGenerator
 			bwdArgs.push_back(toSgnArg({"retval", *c.returnType, ""}));
 		}
 
-		ss << signature(sessAcceptSgnTypeName(c.name), bwdArgs, n);
+		ss << signature(sessionAcceptSignatureTypeName(c.name), bwdArgs, n);
 		return ss.str();
 	}
 
@@ -195,7 +197,7 @@ struct CommonTypeGenerator
 
 		SessionCalls scs;
 
-		ss << indent(n) << "struct " << sessionTypeName(s.name) << std::endl;
+		ss << indent(n) << "namespace " << sessionNamespaceName(s.name) << std::endl;
 		ss << indent(n) << "{" << std::endl;
 
 		bool first = true;
@@ -237,7 +239,7 @@ struct CommonTypeGenerator
 void writeContractTypes(std::stringstream &ss, const Contract& c)
 {
 	printDocs(ss, c.docs, 0);
-	ss << "struct " << contractTypeName(c.name) << std::endl;
+	ss << "namespace " << contractTypesNamespaceName(c.name) << std::endl;
 	ss << "{" << std::endl;
 
 	bool first = true;

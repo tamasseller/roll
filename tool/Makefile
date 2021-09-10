@@ -15,6 +15,7 @@ SOURCES += ast/ContractTextCodec.cpp
 SOURCES += gen/Generator.cpp
 SOURCES += gen/cpp/Cpp.cpp
 SOURCES += gen/cpp/CppCommon.cpp
+SOURCES += gen/cpp/CppSymGen.cpp
 SOURCES += gen/cpp/CppTypeGen.cpp
 SOURCES += gen/cpp/CppStructSerdes.cpp
 
