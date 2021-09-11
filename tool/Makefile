@@ -18,6 +18,9 @@ SOURCES += gen/cpp/CppCommon.cpp
 SOURCES += gen/cpp/CppSymGen.cpp
 SOURCES += gen/cpp/CppTypeGen.cpp
 SOURCES += gen/cpp/CppStructSerdes.cpp
+SOURCES += gen/cpp/CppProxyCommon.cpp
+SOURCES += gen/cpp/CppClientProxy.cpp
+SOURCES += gen/cpp/CppServerProxy.cpp
 
 GENDIR = .gen
 CLEAN_EXTRA += $(GENDIR)

@@ -1,10 +1,8 @@
-#include "CppTypeGen.h"
+#include "CppSymGen.h"
 
 #include "CppCommon.h"
 
 #include <algorithm>
-#include <list>
-#include <iterator>
 
 void writeNamespace(std::stringstream& ss, const std::string name, const std::vector<std::string>& strs, const int n)
 {

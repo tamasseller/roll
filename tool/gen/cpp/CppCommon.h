@@ -11,6 +11,7 @@ namespace detail
 {
 	static constexpr auto indentStep = 4;
 	static constexpr auto symPrefix = "sym";
+	static constexpr auto callMemberPrefix = "id";
 	static constexpr auto typeNsSuffix = "Types";
 	static constexpr auto symNsSuffix = "Symbols";
 	static constexpr auto actSgnTypeSuffix = "Call";
@@ -21,6 +22,8 @@ namespace detail
 	static constexpr auto sessCbSgnTypeSuffix = "Callback";
 	static constexpr auto sessCreateSgnTypeSuffix = "Create";
 	static constexpr auto sessAcceptSgnTypeSuffix = "Accept";
+	static constexpr auto clientProxySuffix = "ClientProxy";
+	static constexpr auto serverProxySuffix = "ServerProxy";
 
 	static inline std::string capitalize(std::string str)
 	{
@@ -55,6 +58,14 @@ static inline auto argumentName(const std::string& n) {
 	return detail::decapitalize(n);
 }
 
+static inline auto clientProxyName(const std::string& n) {
+	return detail::capitalize(n) + detail::clientProxySuffix;
+}
+
+static inline auto serverProxyName(const std::string& n) {
+	return detail::capitalize(n) + detail::serverProxySuffix;
+}
+
 static inline auto contractTypesNamespaceName(const std::string& n) {
 	return detail::capitalize(n) + detail::typeNsSuffix;
 }
@@ -71,6 +82,10 @@ static inline auto symbolName(const std::string& n) {
 	return detail::symPrefix + detail::capitalize(n);
 }
 
+static inline auto callMemberName(const std::string& n) {
+	return detail::callMemberPrefix + detail::capitalize(n);
+}
+
 static inline auto actionSignatureTypeName(const std::string& n) {
 	return detail::capitalize(n) + detail::actSgnTypeSuffix;
 }
@@ -85,6 +100,10 @@ static inline auto callbackSignatureTypeName(const std::string& n) {
 
 static inline auto sessionNamespaceName(const std::string& n) {
 	return detail::capitalize(n) + detail::sessNsSuffix;
+}
+
+static inline auto sessionCtorApiName(const std::string& s, const std::string& c) {
+	return detail::decapitalize(s) + detail::capitalize(c);
 }
 
 static inline auto sessionForwardCallSignatureTypeName(const std::string& n) {

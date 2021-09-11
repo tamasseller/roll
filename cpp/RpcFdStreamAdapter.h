@@ -2,11 +2,15 @@
 #define _RPCFDSTREAMADAPTER_H_
 
 #include "RpcEndpoint.h"
-#include "RpcStlFacade.h"
+#include "RpcStlAdapters.h"
+
+#include <memory>
+#include <list>
+
+#include <cassert>
+#include <cstring>
 
 #include <unistd.h>
-
-#include <list>
 
 namespace rpc {
 

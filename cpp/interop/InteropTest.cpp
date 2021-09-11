@@ -3,22 +3,13 @@
 #include "RpcStlArray.h"
 #include "RpcStlList.h"
 #include "RpcStlTuple.h"
+#include "RpcClient.h"
 #include "RpcStreamReader.h"
 
 #include <iostream>
 #include <string>
 #include <random>
-
-namespace syms
-{
-    static constexpr auto echo = rpc::symbol<std::string, rpc::Call<std::string>>("echo"_ctstr);
-    static constexpr auto nope = rpc::symbol<>("nope"_ctstr);
-    static constexpr auto unlock = rpc::symbol<bool>("unlock"_ctstr);
-    using Close = rpc::Call<>;
-    using Read = rpc::Call<uint32_t, rpc::Call<std::list<uint16_t>>>;
-    using Methods = std::tuple<Close, Read>;
-    static constexpr auto open = rpc::symbol<uint8_t, uint8_t, rpc::Call<Methods>>("open"_ctstr);
-}
+#include <future>
 
 static inline auto generateUniqueKey()
 {
@@ -48,74 +39,88 @@ static inline auto startServiceThread(std::shared_ptr<Rpc> uut)
 
 static inline void runUnknownMethodLookupTest(std::shared_ptr<Rpc> uut)
 {
-    bool erred = false;
+	std::promise<bool> p;
+	auto ret = p.get_future();
 
-    try {
-        auto nope = uut->lookup(syms::nope).get();
-        (void)&nope;
-    } 
-    catch(const std::exception& e)
-    {
-        erred = true;
-        assert(std::string(e.what()).find(rpc::Errors::noSuchSymbol) != std::string::npos);
-    }
+	const char* err = uut->Endpoint::lookup(syms::nope, [p{std::move(p)}](auto&, bool done, auto) mutable { p.set_value(done); });
+	assert(err == nullptr);
 
-    assert(erred);
+	bool failed = ret.get() == false;
+
+    assert(failed);
 }
 
 static inline void runEchoTest(std::shared_ptr<Rpc> uut)
 {
-    rpc::Call<std::string, rpc::Call<std::string>> echo = uut->lookup(syms::echo).get();
-    auto key = generateUniqueKey();
-    auto result = uut->asyncCall(echo, key);
-    assert(result.get() == key);
-}
+	bool done = false;
 
-static inline void runStreamGeneratorTest(std::shared_ptr<Rpc> uut)
-{
-    auto open = uut->lookup(syms::open).get();
+	auto key1 = generateUniqueKey();
+	std::vector<char> keyv;
+	std::copy(key1.begin(), key1.end(), std::back_inserter(keyv));
+    uut->echo(keyv, [&done, key1](const std::string& result)
+	{
+    	assert(result == key1);
+    	done = true;
+	});
 
-    struct Tester
+	auto key2 = generateUniqueKey();
+    std::stringstream ss;
+    for(char c: uut->echo<std::list<char>>(key2).get())
     {
-        uint16_t state;
-        const uint16_t mod;
-        syms::Methods methods;
-        
-        void runTest(decltype(uut)& uut) 
-        {
-            int idx = 0;
-            for(auto v: uut->asyncCall(std::get<1>(methods), 5u).get())
-            {
-                idx++;
-                assert(v == state);
-                state = state * state % mod;
-            }   
-            assert(idx == 5);
-        }
-
-        void close(decltype(uut)& uut) {
-            uut->simpleCall(std::get<0>(methods));
-        }
-    };
-
-    Tester tc1{3, 31, uut->asyncCall(open, uint8_t(3), uint8_t(31)).get()};
-    Tester tc2{5, 17, uut->asyncCall(open, uint8_t(5), uint8_t(17)).get()};
-
-    for(int i = 0; i<10; i++)
-        tc1.runTest(uut);
-
-    for(int i = 0; i<5; i++)
-        tc2.runTest(uut);
-
-    for(int i = 0; i<7; i++)
-    {
-        tc1.runTest(uut);
-        tc2.runTest(uut);
+    	ss.write(&c, 1);
     }
 
-    tc1.close(uut);
-    tc2.close(uut);
+    auto result = ss.str();
+    assert(result == key2);
+
+    assert(done);
 }
+
+//static inline void runStreamGeneratorTest(std::shared_ptr<Rpc> uut)
+//{
+//    auto open = uut->lookupFuture(syms::open).get();
+//
+//    struct Tester
+//    {
+//        uint16_t state;
+//        const uint16_t mod;
+//        syms::Methods methods;
+//
+//        void runTest(decltype(uut)& uut)
+//        {
+//            int idx = 0;
+//            for(auto v: uut->asyncCall(std::get<1>(methods), 5u).get())
+//            {
+//                idx++;
+//                assert(v == state);
+//                state = state * state % mod;
+//            }
+//            assert(idx == 5);
+//        }
+//
+//        void close(decltype(uut)& uut) {
+//            uut->simpleCall(std::get<0>(methods));
+//        }
+//    };
+//
+//    Tester tc1{3, 31, uut->asyncCall(open, uint8_t(3), uint8_t(31)).get()};
+//    Tester tc2{5, 17, uut->asyncCall(open, uint8_t(5), uint8_t(17)).get()};
+//
+//    for(int i = 0; i<10; i++)
+//        tc1.runTest(uut);
+//
+//    for(int i = 0; i<5; i++)
+//        tc2.runTest(uut);
+//
+//    for(int i = 0; i<7; i++)
+//    {
+//        tc1.runTest(uut);
+//        tc2.runTest(uut);
+//    }
+//
+//    tc1.close(uut);
+//    tc2.close(uut);
+//}
 
 std::thread runInteropTests(std::shared_ptr<Rpc> uut)
 {
@@ -181,17 +186,17 @@ std::thread runInteropTests(std::shared_ptr<Rpc> uut)
 
     auto t = startServiceThread(uut);
 
-    uut->simpleCall(uut->lookup(syms::unlock).get(), false);
+    uut->unlock(false);
 
     runUnknownMethodLookupTest(uut);
     runEchoTest(uut);
-    runStreamGeneratorTest(uut);
+    //    runStreamGeneratorTest(uut);
 
-    uut->simpleCall(uut->lookup(syms::unlock).get(), true);
+    uut->unlock(true);
 
     while(locked) std::this_thread::yield();
 
-    assert(makeCnt > 0);
+//    assert(makeCnt > 0);
     assert(delCnt == makeCnt);
     
     return t;

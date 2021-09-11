@@ -163,24 +163,6 @@ namespace detail
             return false;
         }
     };
-
-    template<class...> struct CallEnabler;
-
-    /// Recursor, eats all but last arguments.
-    template<class First, class... Rest>
-    struct CallEnabler<First, Rest...> {
-        template<template<class...> class R> using Retriever = typename CallEnabler<Rest...>::template Retriever<R>;
-    };
-
-    /// Last element handler (for non-Call types)
-    template<class C> struct CallEnabler<C> { template<template <class...> class> class Retriever {}; };
-    template<> struct CallEnabler<> { template<template <class...> class> class Retriever {}; };
-
-    /// Last element handler (for Call types)
-    template<class... CbArgs>
-    struct CallEnabler<rpc::Call<CbArgs...>> {
-        template<template<class...> class R> using Retriever = R<void, CbArgs...>;
-    };
 }
 
 }

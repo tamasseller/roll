@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <list>
-#include <iterator>
 
 struct CommonTypeGenerator
 {
