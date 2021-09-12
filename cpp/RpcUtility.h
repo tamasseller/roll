@@ -9,6 +9,14 @@ namespace detail
     struct true_type { static constexpr auto value = true; };
     template<class> struct is_lvalue_reference: public false_type { };
     template<class T> struct is_lvalue_reference<T&>: public true_type { };
+
+    template<int n, class> struct nth_argument;
+
+    template<class C, class A, class... As> struct nth_argument<0, void(C::*)(A, As...)> { using T = A; };
+    template<class C, class A, class... As> struct nth_argument<0, void(C::*)(A, As...) const> { using T = A; };
+
+    template<int n, class C, class A, class... As> struct nth_argument<n, void(C::*)(A, As...)> { using T = typename nth_argument<n - 1, void(C::*)(A, As...)>::T; };
+    template<int n, class C, class A, class... As> struct nth_argument<n, void(C::*)(A, As...) const> { using T = typename nth_argument<n - 1, void(C::*)(A, As...)>::T; };
 }
 
 /**
@@ -34,7 +42,8 @@ template<class T> struct remove_const<const T> { using type = T;  };
  */
 template<class T> using remove_const_t = typename remove_const<T>::type;
 
-template<class T> using base_type = remove_const_t<remove_reference_t<T>>;
+template<class T> using remove_cref_t = remove_const_t<remove_reference_t<T>>;
+
 
 /**
  * Same as std::forward, re-implemented for dependency purposes.
@@ -61,6 +70,8 @@ template<typename T>
 constexpr remove_reference_t<T>&& move(T&& t) {
     return static_cast<remove_reference_t<T>&&>(t);
 }
+
+template<int n, class C> using Arg = typename detail::nth_argument<n, decltype(&C::operator())>::T;
 
 }
 

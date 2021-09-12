@@ -20,10 +20,6 @@ struct ContractSerDes
 		Primitive, Collection, Aggregate, Alias
 	};
 
-	enum class PrimitiveSelector {
-		I1, U1, I2, U2, I4, U4, I8, U8
-	};
-
 	enum class SessionItemSelector {
 		Constructor, ForwardCall, CallBack, None
 	};
@@ -48,36 +44,10 @@ class ContractSerializer: public ContractSerDes
 		child()->write(TypeRefSelector::None);
 	}
 
-	inline void writePrimitive(const Contract::Primitive& a)
-	{
-		if(a.isSigned)
-		{
-			if(a.length == 1)
-				child()->write(PrimitiveSelector::I1);
-			else if(a.length == 2)
-				child()->write(PrimitiveSelector::I2);
-			else if(a.length == 4)
-				child()->write(PrimitiveSelector::I4);
-			else
-				child()->write(PrimitiveSelector::I8);
-		}
-		else
-		{
-			if(a.length == 1)
-				child()->write(PrimitiveSelector::U1);
-			else if(a.length == 2)
-				child()->write(PrimitiveSelector::U2);
-			else if(a.length == 4)
-				child()->write(PrimitiveSelector::U4);
-			else
-				child()->write(PrimitiveSelector::U8);
-		}
-	}
-
 	inline void refKind(const Contract::Primitive& a)
 	{
 		child()->write(TypeRefSelector::Primitive);
-		writePrimitive(a);
+		child()->write(a);
 	}
 
 	inline void refKind(const Contract::Collection& a)
@@ -111,7 +81,7 @@ class ContractSerializer: public ContractSerDes
 	inline void defKind(const Contract::Primitive& a)
 	{
 		child()->write(TypeDefSelector::Primitive);
-		writePrimitive(a);
+		child()->write(a);
 	}
 
 	inline void defKind(const Contract::Collection& a)
@@ -222,20 +192,9 @@ class ContractDeserializer: public ContractSerDes
 
 	Contract::Primitive primitive()
 	{
-		PrimitiveSelector p;
+		Contract::Primitive p;
 		child()->read(p);
-
-		switch(p)
-		{
-			case PrimitiveSelector::I1: return Contract::Primitive{true, 1};
-			case PrimitiveSelector::U1: return Contract::Primitive{false, 1};
-			case PrimitiveSelector::I2: return Contract::Primitive{true, 2};
-			case PrimitiveSelector::U2: return Contract::Primitive{false, 2};
-			case PrimitiveSelector::I4: return Contract::Primitive{true, 4};
-			case PrimitiveSelector::U4: return Contract::Primitive{false, 4};
-			case PrimitiveSelector::I8: return Contract::Primitive{true, 8};
-			default: return Contract::Primitive{false, 8};
-		}
+		return p;
 	}
 
 	std::optional<Contract::TypeRef> typeRef()

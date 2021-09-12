@@ -2,8 +2,12 @@
 #define RPC_CPP_INTEROP_RPCCLIENT_H_
 
 #include "RpcFail.h"
+#include "RpcUtility.h"
+#include "RpcEndpoint.h"
+#include "RpcStlAdapters.h"
 
 #include <mutex>
+#include <future>
 #include <condition_variable>
 
 namespace rpc {
@@ -27,13 +31,45 @@ class ClientBase:
 	>
 {
     friend typename ClientBase::Endpoint;
-	friend Io;
 
     volatile bool locked;
     std::mutex m;
     std::condition_variable cv;
 
 public:
+    template<class Call, class Callback, class... Args>
+    void callWithCallback(Call& call, Callback&& cb, Args&&... args)
+    {
+    	auto id = this->install([cb{std::move(cb)}](Endpoint& rpc, rpc::MethodHandle h, rpc::Arg<0, Callback> arg)
+		{
+    		cb(rpc::move(arg));
+    		rpc.uninstall(h);
+    	});
+
+    	call.call(*this, std::forward<Args>(args)..., id);
+    }
+
+    template<class Ret, class Call, class... Args>
+    std::future<Ret> callWithPromise(Call& call, Args&&... args)
+    {
+    	std::promise<Ret> p;
+    	auto f = p.get_future();
+
+    	auto id = this->install([p{std::move(p)}](Endpoint& rpc, rpc::MethodHandle h, Ret arg) mutable
+		{
+    		p.set_value(arg);
+    		rpc.uninstall(h);
+    	});
+
+    	call.call(*this, std::forward<Args>(args)..., id);
+    	return f;
+    }
+
+    template<class Call, class... Args>
+    void callAction(Call& call, Args&&... args) {
+    	call.call(*this, std::forward<Args>(args)...);
+    }
+
     inline void waitLookup()
     {
     	if(locked)

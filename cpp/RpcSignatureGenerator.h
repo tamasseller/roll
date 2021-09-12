@@ -34,12 +34,12 @@ struct SignatureGenerator<First, Rest...>
 {
 	template<class S>
 	static inline constexpr decltype(auto) writeNextType(S&& s) {
-		return SignatureGenerator<Rest...>::writeNextType(TypeInfo<base_type<First>>::writeName(s << ","));
+		return SignatureGenerator<Rest...>::writeNextType(TypeInfo<remove_cref_t<First>>::writeName(s << ","));
 	}
 
 	template<class S>
 	static inline constexpr decltype(auto) writeTypes(S&& s) { 
-		return SignatureGenerator<Rest...>::writeNextType(TypeInfo<base_type<First>>::writeName(s));
+		return SignatureGenerator<Rest...>::writeNextType(TypeInfo<remove_cref_t<First>>::writeName(s));
 	}
 };
 

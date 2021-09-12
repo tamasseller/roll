@@ -36,8 +36,38 @@ struct SemanticParser
 		return uint8_t(-1u);
 	}
 
-	static inline Contract::Primitive makePrimitive(const std::string& str) {
-		return {str[0] == 'i' || str[0] == 'I', getLength(str[1])};
+	static inline Contract::Primitive makePrimitive(const std::string& str)
+	{
+		if(str == "bool")
+		{
+			return Contract::Primitive::Bool;
+		}
+		else if(str[0] == 'i' || str[0] == 'I')
+		{
+			switch(str[1])
+			{
+			case '1': return Contract::Primitive::I1;
+			case '2': return Contract::Primitive::I2;
+			case '4': return Contract::Primitive::I4;
+			case '8': return Contract::Primitive::I8;
+			default: throw std::runtime_error("Unknown primitive type: " + str);
+			}
+		}
+		else if(str[0] == 'u' || str[0] == 'U')
+		{
+			switch(str[1])
+			{
+			case '1': return Contract::Primitive::U1;
+			case '2': return Contract::Primitive::U2;
+			case '4': return Contract::Primitive::U4;
+			case '8': return Contract::Primitive::U8;
+			default: throw std::runtime_error("Unknown primitive type: " + str);
+			}
+		}
+		else
+		{
+			throw std::runtime_error("Unknown primitive type: " + str);
+		}
 	}
 
 	static inline std::string trim(std::string full, size_t initialOffset, size_t finalOffset)

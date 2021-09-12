@@ -7,9 +7,10 @@
 #include "RpcStlList.h"
 #include "RpcStlTuple.h"
 
+#include "Contract.gen.h"
+
 #include <thread>
 #include <memory>
-#include <future>
 
 namespace syms
 {
@@ -22,57 +23,40 @@ namespace syms
     static constexpr auto open = rpc::symbol<uint8_t, uint8_t, rpc::Call<Methods>>("open"_ctstr);
 }
 
-template<class> struct FirstArgument;
-template<class C, class A> struct FirstArgument<void(C::*)(A)> { using T = A; };
-template<class C, class A> struct FirstArgument<void(C::*)(A) const> { using T = A; };
-
 template<class Child>
 class RpcInteropTest: public rpc::ClientBase<Child>
 {
-    using RpcInteropTest::ClientBase::ClientBase;
-
     rpc::OnDemand<decltype(syms::unlock)> unlockCall = syms::unlock;
     rpc::OnDemand<decltype(syms::echo)> echoCall = syms::echo;
 
 public:
-	using Endpoint = typename RpcInteropTest::ClientBase::Endpoint;
+    using RpcInteropTest::ClientBase::ClientBase;
 
-	template<class... Args>
-    inline void unlock(Args... args) {
-    	this->unlockCall.call(*this, std::forward<Args>(args)...);
+	template<class A0>
+    inline auto unlock(A0&& doIt) {
+		static_assert(rpc::isCompatible<A0, bool>(), "First argument of echo must be of type 'bool'");
+		return this->callAction(unlockCall, std::forward<A0>(doIt));
     }
 
-    template<class C, class A0>
-    inline void echo(A0&& v, C&& c)
+    template<class A0, class C>
+    inline auto echo(A0&& v, C&& c)
     {
-    	auto id = this->install([c{std::move(c)}](Endpoint& rpc, rpc::MethodHandle h, typename FirstArgument<decltype(&C::operator())>::T arg)
-		{
-    		c(rpc::move(arg));
-    		rpc.uninstall(h);
-    	});
-
-    	this->echoCall.call(*this, std::forward<A0>(v), id);
+    	static_assert(rpc::isCompatible<A0, rpc::CollectionPlaceholder<int8_t>>(), "First argument of echo must be of type 'str'");
+    	static_assert(rpc::isCompatible<rpc::Arg<0, C>, rpc::CollectionPlaceholder<int8_t>>(), "Callback for echo must take a first argument compatible with 'str'");
+    	return this->callWithCallback(echoCall, std::move(c), std::forward<A0>(v));
     }
 
-    template<class T, class A0>
-    inline std::future<T> echo(A0&& v)
+    template<class Ret, class A0>
+    inline auto echo(A0&& v)
     {
-    	std::promise<T> p;
-    	auto f = p.get_future();
-
-    	auto id = this->install([p{std::move(p)}](Endpoint& rpc, rpc::MethodHandle h, T arg) mutable
-		{
-    		p.set_value(arg);
-    		rpc.uninstall(h);
-    	});
-
-    	this->echoCall.call(*this, std::forward<A0>(v), id);
-    	return f;
+    	static_assert(rpc::isCompatible<A0, rpc::CollectionPlaceholder<int8_t>>(), "First argument of echo must be of type 'str'");
+    	static_assert(rpc::isCompatible<Ret, rpc::CollectionPlaceholder<int8_t>>(), "Echo can only return a type compatible with 'str'");
+    	return this->template callWithPromise<Ret>(echoCall, std::forward<A0>(v));
     }
 };
 
-struct Rpc: RpcInteropTest<rpc::FdStreamAdapter> {
-    using Rpc::RpcInteropTest::RpcInteropTest;
+struct Rpc: InteropTestClientProxy<rpc::FdStreamAdapter> {
+    using Rpc::InteropTestClientProxy::InteropTestClientProxy;
 };
 
 std::thread runInteropTests(std::shared_ptr<Rpc>);

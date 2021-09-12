@@ -34,7 +34,7 @@ now(): u8;
 name(): [i1];
 netif = {name:[i1] , id:i4 ,corr:u4};
 ifs(): [netif];
-s1 = {s:i1};
+s1 = {s:bool};
 s2 = {a:i1};
 s3 = {c:[s2]};
 s4 = {e:[s3]};

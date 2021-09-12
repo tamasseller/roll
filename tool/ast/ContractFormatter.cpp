@@ -177,7 +177,7 @@ static inline std::string list(const FormatOptions& opts, const int n, const C &
 }
 
 static inline std::string typeRefKindToString(const FormatOptions& opts, const int n, const Contract::Primitive& p) {
-	return opts.colorize(std::string(p.isSigned ? "i" : "u") + std::to_string(p.length), FormatOptions::Highlight::Primitive);
+	return opts.colorize(Contract::mapPrimitive(p), FormatOptions::Highlight::Primitive);
 }
 
 static inline std::string typeRefKindToString(const FormatOptions& opts, const int n, const Contract::Collection& c) {

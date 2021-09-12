@@ -19,7 +19,7 @@ namespace detail
 	{
 		template<class Core, class C>
 		static inline decltype(auto) install(Core &core, C&& c) {
-			return Call<base_type<Args>...>{core.template add<base_type<Args>...>(rpc::forward<C>(c))};
+			return Call<remove_cref_t<Args>...>{core.template add<remove_cref_t<Args>...>(rpc::forward<C>(c))};
 		}
 	};
 

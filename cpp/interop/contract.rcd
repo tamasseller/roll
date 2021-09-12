@@ -1,0 +1,13 @@
+/*
+ * RPC interoperability test suite.
+ */
+$interopTest;
+
+/* A character string */
+str = [i1];
+
+/* Allow remote UUT to exit (must be called before waiting unlocking) */ 
+unlock(doIt: bool);
+
+/* Send an exact reply of the argument */
+echo(/* The value to be echoed */ v: str): str;

@@ -47,3 +47,54 @@ void printDocs(std::stringstream &ss, const std::string& str, const int n)
 		ss << " */" << std::endl;
 	}
 }
+
+bool writeBlock(std::stringstream& ss, const std::string header, const std::vector<std::string>& strs, const int n)
+{
+	bool first = true;
+	bool prevMultiLine;
+	for(const auto& s: strs)
+	{
+		if(s.length())
+		{
+			bool multiline = s.find_first_of('\n') != std::string::npos;
+
+			if(first)
+			{
+				first = false;
+				ss << indent(n) << header << std::endl;
+				ss << indent(n) << "{" << std::endl;
+			}
+			else
+			{
+				if(multiline || prevMultiLine)
+				{
+					ss << std::endl;
+				}
+			}
+
+			ss << s << std::endl;
+			prevMultiLine = multiline;
+		}
+	}
+
+	if(!first)
+	{
+		ss << indent(n) << "}";
+		return true;
+	}
+
+	return false;
+}
+
+void writeTopLevelBlock(std::stringstream& ss, const std::string header, const std::vector<std::string>& strs, bool addSemicolon)
+{
+	if(writeBlock(ss, header, strs, 0))
+	{
+		if(addSemicolon)
+		{
+			ss << ";";
+		}
+
+		ss << std::endl << std::endl;
+	}
+}

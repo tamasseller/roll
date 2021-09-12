@@ -77,12 +77,12 @@ namespace detail
 
 	template<class Arg>
 	static constexpr inline size_t getSize(const Arg& c) {
-		return TypeInfo<base_type<Arg>>::size(c);
+		return TypeInfo<remove_cref_t<Arg>>::size(c);
 	}
 
 	template<class Arg, class S>
 	static constexpr inline size_t writeEntry(S& s, Arg&& c) {
-		return TypeInfo<base_type<Arg>>::write(s, rpc::forward<Arg>(c));
+		return TypeInfo<remove_cref_t<Arg>>::write(s, rpc::forward<Arg>(c));
 	}
 }
 

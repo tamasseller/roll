@@ -11,8 +11,8 @@ void writeCommonHeader(std::stringstream &ss)
 {
 	ss << "#include \"RpcCall.h\"" << std::endl;
 	ss << "#include \"RpcSymbol.h\"" << std::endl;
-	ss << "#include \"RpcTypeInfo.h\"" << std::endl;
 	ss << "#include \"RpcStruct.h\"" << std::endl;
+	ss << "#include \"RpcTypeInfo.h\"" << std::endl;
 }
 
 template<void (*directionSpecific)(std::stringstream&, const Contract&)>
@@ -31,9 +31,9 @@ std::string CodeGenCpp::generateClient(const std::vector<Contract>& cs) const
 {
 	std::stringstream ss;
 	writeCommonHeader(ss);
-	ss << std::endl;
+	ss << "#include \"RpcClient.h\"" << std::endl << std::endl;
+
 	generateSource<writeClientProxy>(ss, cs);
-	ss << std::endl;
 	return ss.str();
 }
 
@@ -43,6 +43,5 @@ std::string CodeGenCpp::generateServer(const std::vector<Contract>& cs) const
 	writeCommonHeader(ss);
 	ss << std::endl;
 	generateSource<writeServerProxy>(ss, cs);
-	ss << std::endl;
 	return ss.str();
 }

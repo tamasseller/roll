@@ -7,26 +7,12 @@
 
 struct CommonTypeGenerator
 {
-	static inline std::string handleTypeRef(const Contract::Primitive& p)
-	{
-		std::stringstream ss;
+	static inline std::string handleTypeRef(const Contract::Primitive& p) { return cppPrimitive(p); }
 
-		if(!p.isSigned)
-			ss << "u";
+	static inline std::string handleTypeRef(const std::string &n) { return userTypeName(n); }
 
-		ss << "int" << std::to_string(p.length * 8) << "_t";
-		return ss.str();
-	}
-
-	static inline std::string handleTypeRef(const std::string &n) {
-		return userTypeName(n);
-	}
-
-	static inline std::string handleTypeRef(const Contract::Collection &c)
-	{
-		std::stringstream ss;
-		ss << "rpc::CollectionPlaceholder<" << std::visit([](const auto& e){return handleTypeRef(e);}, *c.elementType) << ">";
-		return ss.str();
+	static inline std::string handleTypeRef(const Contract::Collection &c) {
+		return "rpc::CollectionPlaceholder<" + std::visit([](const auto& e){return handleTypeRef(e);}, *c.elementType) + ">";
 	}
 
 	static inline std::string handleTypeDef(const std::string& name, const Contract::Aggregate& a, const int n)
@@ -257,5 +243,5 @@ void writeContractTypes(std::stringstream &ss, const Contract& c)
 		ss << std::visit([](const auto& i){ return CommonTypeGenerator::handleItem(i, 1); }, i.second) << std::endl;
 	}
 
-	ss << "};" << std::endl << std::endl;
+	ss << "}" << std::endl << std::endl;
 }

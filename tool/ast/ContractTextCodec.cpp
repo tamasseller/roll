@@ -133,36 +133,38 @@ template<>struct Mapping<ContractSerDes::SessionItemSelector>: ContractSerDes
 	}
 };
 
-template<>struct Mapping<ContractSerDes::PrimitiveSelector>: ContractSerDes
+template<>struct Mapping<Contract::Primitive>: ContractSerDes
 {
-	static inline char encode(PrimitiveSelector v)
+	static inline char encode(Contract::Primitive v)
 	{
 		switch(v)
 		{
-			case PrimitiveSelector::I1: return '0';
-			case PrimitiveSelector::U1: return '1';
-			case PrimitiveSelector::I2: return '2';
-			case PrimitiveSelector::U2: return '3';
-			case PrimitiveSelector::I4: return '4';
-			case PrimitiveSelector::U4: return '5';
-			case PrimitiveSelector::I8: return '6';
-			case PrimitiveSelector::U8: return '7';
+			case Contract::Primitive::I1: return '0';
+			case Contract::Primitive::U1: return '1';
+			case Contract::Primitive::I2: return '2';
+			case Contract::Primitive::U2: return '3';
+			case Contract::Primitive::I4: return '4';
+			case Contract::Primitive::U4: return '5';
+			case Contract::Primitive::I8: return '6';
+			case Contract::Primitive::U8: return '7';
+			case Contract::Primitive::Bool: return '8';
 			default: throw std::runtime_error("Invalid input to encoder");
 		}
 	}
 
-	static inline PrimitiveSelector decode(char c)
+	static inline Contract::Primitive decode(char c)
 	{
 		switch(c)
 		{
-			case '0': return PrimitiveSelector::I1;
-			case '1': return PrimitiveSelector::U1;
-			case '2': return PrimitiveSelector::I2;
-			case '3': return PrimitiveSelector::U2;
-			case '4': return PrimitiveSelector::I4;
-			case '5': return PrimitiveSelector::U4;
-			case '6': return PrimitiveSelector::I8;
-			case '7': return PrimitiveSelector::U8;
+			case '0': return Contract::Primitive::I1;
+			case '1': return Contract::Primitive::U1;
+			case '2': return Contract::Primitive::I2;
+			case '3': return Contract::Primitive::U2;
+			case '4': return Contract::Primitive::I4;
+			case '5': return Contract::Primitive::U4;
+			case '6': return Contract::Primitive::I8;
+			case '7': return Contract::Primitive::U8;
+			case '8': return Contract::Primitive::Bool;
 			default: throw std::runtime_error("Invalid code found during decoding");
 		}
 	}

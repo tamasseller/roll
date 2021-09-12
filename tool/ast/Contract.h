@@ -9,24 +9,18 @@
 
 struct Contract
 {
-	struct Primitive;  	//< Primitive integers (like char/short/int/long).
 	struct Collection; 	//< Variably sized array (like std::vector).
 	struct Aggregate; 	//< Structured data (like a struct)
 	struct Var; 		//< A named slot for a value of a predetermined type.
 
+	/// Single 1/2/4/8 byte signed/unsigned word (primitive integers).
+	enum class Primitive
+	{
+		Bool, I1, U1, I2, U2, I4, U4, I8, U8
+	};
+
 	using TypeRef = std::variant<Primitive, Collection, std::string>;
 	using TypeDef = std::variant<Primitive, Collection, Aggregate, std::string>;
-
-	/// Single 1/2/4/8 byte signed/unsigned word (primitive integers).
-	struct Primitive
-	{
-		const bool isSigned;
-		const int length;
-
-		inline bool operator==(const Primitive& o) const {
-			return isSigned == o.isSigned && length == o.length;
-		}
-	};
 
 	/// Zero or more elements of the same type (dynamic array).
 	struct Aggregate
@@ -115,6 +109,23 @@ struct Contract
 
 	inline bool operator==(const Contract& o) const {
 		return items == o.items;
+	}
+
+	static inline std::string mapPrimitive(Contract::Primitive p)
+	{
+		switch(p)
+		{
+		case Contract::Primitive::Bool: return "bool";
+		case Contract::Primitive::I1: return "i1";
+		case Contract::Primitive::U1: return "u1";
+		case Contract::Primitive::I2: return "i2";
+		case Contract::Primitive::U2: return "u2";
+		case Contract::Primitive::I4: return "i4";
+		case Contract::Primitive::U4: return "u4";
+		case Contract::Primitive::I8: return "i8";
+		case Contract::Primitive::U8: return "u8";
+		default: throw std::runtime_error("unknown primitive type: " + std::to_string((int)p));
+		}
 	}
 };
 

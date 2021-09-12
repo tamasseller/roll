@@ -2,6 +2,8 @@
 
 #include "CppCommon.h"
 
+#include <algorithm>
+
 struct StructTypeInfoGenerator
 {
 	static inline std::string handleTypeDef(const std::string& name, const Contract::Aggregate& a, const int n)
@@ -9,12 +11,20 @@ struct StructTypeInfoGenerator
 		std::stringstream ss;
 		ss << indent(n) << "template<> struct TypeInfo<" << name << ">: StructTypeInfo<" << name;
 
-		for(const auto& m: a.members)
+		if(a.members.size() > 1)
 		{
-			ss << "," << std::endl << indent(n + 1) << "StructMember<&" << name << "::" << m.name << ">";
+			for(const auto& m: a.members)
+			{
+				ss << "," << std::endl << indent(n + 1) << "StructMember<&" << name << "::" << m.name << ">";
+			}
+
+			ss << std::endl << indent(n) << "> {};";
+		}
+		else
+		{
+			ss << ", " << "StructMember<&" << name << "::" << a.members.front().name << ">> {};";
 		}
 
-		ss << std::endl << indent(n) << "> {};" << std::endl;
 		return ss.str();
 	}
 
@@ -30,30 +40,11 @@ struct StructTypeInfoGenerator
 
 void writeStructTypeInfo(std::stringstream &ss, const Contract& c)
 {
-	bool first = true;
-	for(const auto& i: c.items)
-	{
-		const auto str = std::visit([&c](const auto& i){ return StructTypeInfoGenerator::handleItem(c.name, i, 1); }, i.second);
+	std::vector<std::string> strs;
 
-		if(str.length())
-		{
-			if(first)
-			{
-				first = false;
-				ss << "namespace rpc" << std::endl;
-				ss << "{" << std::endl;
-			}
-			else
-			{
-				ss << std::endl;
-			}
-		}
+	std::transform(c.items.begin(), c.items.end(), std::back_inserter(strs), [&c](const auto &i){
+		return std::visit([&c](const auto& i){ return StructTypeInfoGenerator::handleItem(c.name, i, 1); }, i.second);
+	});
 
-		ss << str;
-	}
-
-	if(!first)
-	{
-		ss << "};" << std::endl << std::endl;
-	}
+	writeTopLevelBlock(ss, "namespace rpc", strs, false);
 }

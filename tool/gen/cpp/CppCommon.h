@@ -1,7 +1,10 @@
 #ifndef RPC_TOOL_GEN_CPP_CPPCOMMON_H_
 #define RPC_TOOL_GEN_CPP_CPPCOMMON_H_
 
+#include "ast/Contract.h"
+
 #include <string>
+#include <vector>
 #include <sstream>
 
 #include <cassert>
@@ -50,11 +53,36 @@ inline std::string indent(const int n) {
 	return std::string(n * detail::indentStep, ' ');
 }
 
+bool writeBlock(std::stringstream& ss, const std::string header, const std::vector<std::string>& strs, const int n);
+
+void writeTopLevelBlock(std::stringstream& ss, const std::string header, const std::vector<std::string>& strs, bool addSemicolon);
+
+static inline std::string cppPrimitive(Contract::Primitive p)
+{
+	switch(p)
+	{
+	case Contract::Primitive::Bool: return "bool";
+	case Contract::Primitive::I1: return "int8_t";
+	case Contract::Primitive::U1: return "uint8_t";
+	case Contract::Primitive::I2: return "int16_t";
+	case Contract::Primitive::U2: return "uint16_t";
+	case Contract::Primitive::I4: return "int32_t";
+	case Contract::Primitive::U4: return "uint32_t";
+	case Contract::Primitive::I8: return "int64_t";
+	case Contract::Primitive::U8: return "uint64_t";
+	default: throw std::runtime_error("unknown primitive type: " + std::to_string((int)p));
+	}
+}
+
 static inline auto aggregateMemberName(const std::string& n) {
 	return detail::decapitalize(n);
 }
 
 static inline auto argumentName(const std::string& n) {
+	return detail::decapitalize(n);
+}
+
+static inline auto invocationMemberFunctionName(const std::string& n) {
 	return detail::decapitalize(n);
 }
 

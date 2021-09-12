@@ -227,6 +227,14 @@ template<class... Types> struct AggregateTypeBase
 	}
 };
 
+/**
+ * Checks - in compile time - that two types are compatible serialization-wise.
+ */
+template<class T, class U>
+static constexpr bool isCompatible() {
+	return TypeInfo<remove_cref_t<T>>::writeName(""_ctstr) == TypeInfo<remove_cref_t<U>>::writeName(""_ctstr);
+}
+
 }
 
 #endif /* _RPCTYPEINFO_H_ */

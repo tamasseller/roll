@@ -44,7 +44,7 @@ public:
 	inline std::string invokeGenerator(const std::vector<Contract>& ast)
 	{
 		std::stringstream ss;
-		ss << (language->*direction)(ast) << std::endl;
+		ss << (language->*direction)(ast);
 		return ss.str();
 	}
 };

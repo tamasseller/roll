@@ -21,7 +21,7 @@ contract: '$' WS* name=IDENTIFIER;
 item: WS* (docs=DOCS)? WS* (cont=contract | func=function | alias=typeAlias | sess=session) WS*;
 rpc: items+=item (DECLSEP+ (items+=item | EOF))*;
 
-PRIMITIVE:      [IiUu][1248];
+PRIMITIVE:      ([IiUu][1248]|'bool');
 IDENTIFIER:     [_a-zA-Z][_a-zA-Z0-9]*;
 DOCS:			'/*' .*? '*/';
 LISTSEP: 		WS* ',' WS*;

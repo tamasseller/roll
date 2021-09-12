@@ -20,3 +20,13 @@ LIBS += pthread
 COVROOT = ..
 
 include ../../ultimate-makefile/Makefile.ultimate
+
+RPCTOOL = ../../tool/rpc-tool
+
+$(abspath InteropTest.h): $(abspath Contract.gen.h)
+
+$(abspath Contract.gen.h): contract.rcd
+	$(RPCTOOL) codegen -l cpp -i $< -o $@
+
+$(RPCTOOL): 
+	make -C $(dirname $@)

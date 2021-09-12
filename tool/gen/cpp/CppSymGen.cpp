@@ -4,41 +4,6 @@
 
 #include <algorithm>
 
-void writeNamespace(std::stringstream& ss, const std::string name, const std::vector<std::string>& strs, const int n)
-{
-	bool first = true;
-	bool prevMultiLine;
-	for(const auto& s: strs)
-	{
-		if(s.length())
-		{
-			bool multiline = s.find_first_of('\n') != std::string::npos;
-
-			if(first)
-			{
-				first = false;
-				ss << indent(n) << "namespace " << name << std::endl;
-				ss << indent(n) << "{" << std::endl;
-			}
-			else
-			{
-				if(multiline || prevMultiLine)
-				{
-					ss << std::endl;
-				}
-			}
-
-			ss << s << std::endl;
-			prevMultiLine = multiline;
-		}
-	}
-
-	if(!first)
-	{
-		ss << indent(n) << "};";
-	}
-}
-
 struct CommonSymbolGenerator
 {
 	template<class C>
@@ -72,7 +37,7 @@ struct CommonSymbolGenerator
 			return std::visit([n, t](const auto& i){ return handleSessionItem(t, i, n + 1); }, it.second);
 		});
 
-		writeNamespace(ss, sessionNamespaceName(s.name), strs, n);
+		writeBlock(ss, "namespace " + sessionNamespaceName(s.name), strs, n);
 		return ss.str();
 	}
 };
@@ -85,6 +50,5 @@ void writeContractSymbols(std::stringstream &ss, const Contract& c)
 		return std::visit([&c, t](const auto& i){ return CommonSymbolGenerator::handleItem(t, i, 1); }, i.second);
 	});
 
-	writeNamespace(ss, contractSymbolsNamespaceName(c.name), strs, 0);
-	ss << std::endl << std::endl;
+	writeTopLevelBlock(ss, "namespace " + contractSymbolsNamespaceName(c.name), strs, false);
 }
