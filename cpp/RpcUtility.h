@@ -10,13 +10,29 @@ namespace detail
     template<class> struct is_lvalue_reference: public false_type { };
     template<class T> struct is_lvalue_reference<T&>: public true_type { };
 
+    template<class> struct return_type;
+    template<class R, class... As> struct return_type<R(As...)> { using T = R; };
+    template<class R, class... As> struct return_type<R(*)(As...)> { using T = R; };
+    template<class R, class C, class... As> struct return_type<R(C::*)(As...)> { using T = R; };
+    template<class R, class C, class... As> struct return_type<R(C::*)(As...) const> { using T = R; };
+
+    template<class> struct argument_count;
+    template<class R, class... As> struct argument_count<R(As...)> { static inline constexpr auto n = sizeof...(As); };
+    template<class R, class... As> struct argument_count<R(*)(As...)> { static inline constexpr auto n = sizeof...(As); };
+    template<class R, class C, class... As> struct argument_count<R(C::*)(As...)> { static inline constexpr auto n = sizeof...(As); };
+    template<class R, class C, class... As> struct argument_count<R(C::*)(As...) const> { static inline constexpr auto n = sizeof...(As); };
+
     template<int n, class> struct nth_argument;
 
-    template<class C, class A, class... As> struct nth_argument<0, void(C::*)(A, As...)> { using T = A; };
-    template<class C, class A, class... As> struct nth_argument<0, void(C::*)(A, As...) const> { using T = A; };
+    template<class R, class A, class... As> struct nth_argument<0, R(A, As...)> { using T = A; };
+    template<class R, class A, class... As> struct nth_argument<0, R(*)(A, As...)> { using T = A; };
+    template<class R, class C, class A, class... As> struct nth_argument<0, R(C::*)(A, As...)> { using T = A; };
+    template<class R, class C, class A, class... As> struct nth_argument<0, R(C::*)(A, As...) const> { using T = A; };
 
-    template<int n, class C, class A, class... As> struct nth_argument<n, void(C::*)(A, As...)> { using T = typename nth_argument<n - 1, void(C::*)(A, As...)>::T; };
-    template<int n, class C, class A, class... As> struct nth_argument<n, void(C::*)(A, As...) const> { using T = typename nth_argument<n - 1, void(C::*)(A, As...)>::T; };
+    template<int n, class R, class A, class... As> struct nth_argument<n, R(A, As...)> { using T = typename nth_argument<n - 1, R(As...)>::T; };
+    template<int n, class R, class A, class... As> struct nth_argument<n, R(*)(A, As...)> { using T = typename nth_argument<n - 1, R(*)(As...)>::T; };
+    template<int n, class R, class C, class A, class... As> struct nth_argument<n, R(C::*)(A, As...)> { using T = typename nth_argument<n - 1, R(C::*)(As...)>::T; };
+    template<int n, class R, class C, class A, class... As> struct nth_argument<n, R(C::*)(A, As...) const> { using T = typename nth_argument<n - 1, R(C::*)(As...)>::T; };
 }
 
 /**
@@ -71,7 +87,11 @@ constexpr remove_reference_t<T>&& move(T&& t) {
     return static_cast<remove_reference_t<T>&&>(t);
 }
 
-template<int n, class C> using Arg = typename detail::nth_argument<n, decltype(&C::operator())>::T;
+template<int n, auto p> using Arg = typename detail::nth_argument<n, decltype(p)>::T;
+template<auto p> using Ret = typename detail::return_type<decltype(p)>::T;
+
+template<auto p> static constexpr auto &nArgs = detail::argument_count<decltype(p)>::n;
+
 
 }
 

@@ -43,7 +43,7 @@ struct SymbolReferenceExtractor
 
 		std::vector<std::string> strs;
 		std::transform(coll.begin(), coll.end(), std::back_inserter(strs), [](const auto& it) {
-			return indent(1) + "rpc::OnDemand<decltype(" + it[1] + ")> " + callMemberName(it[0]) + " = " + it[1] + ";";
+			return indent(1) + "Link<decltype(" + it[1] + ")> " + callMemberName(it[0]) + " = " + it[1] + ";";
 		});
 
 		return strs;
@@ -68,24 +68,6 @@ struct MemberFunctionGenerator
 //			std::visit([&ret, &cName, sName{s.name}, docs{i.first}](const auto& i){ return handleSessionItem(ret, i, cName, sName, docs); }, i.second);
 //		}
 //	}
-
-	static inline std::string cppTypeRef(const Contract::Primitive& p, const std::string& cName) { return cppPrimitive(p); }
-
-	static inline std::string cppTypeRef(const std::string &n, const std::string& cName) {
-		return contractTypesNamespaceName(cName) + "::" + userTypeName(n);
-	}
-
-	static inline std::string cppTypeRef(const Contract::Collection &c, const std::string& cName) {
-		return "rpc::CollectionPlaceholder<" + std::visit([&cName](const auto& e){ return cppTypeRef(e, cName); }, *c.elementType) + ">";
-	}
-
-	static inline std::string refTypeRef(const Contract::Primitive& p) { return Contract::mapPrimitive(p); }
-	static inline std::string refTypeRef(const std::string &n) { return n; }
-
-	static inline std::string refTypeRef(const Contract::Collection &c) {
-		return "[" + std::visit([](const auto& e){ return refTypeRef(e); }, *c.elementType) + "]";
-	}
-
 	using ArgInfo = std::array<std::string, 3>;
 
 	static inline std::string templateArgList(int n, std::optional<std::string> extra = {})
@@ -127,13 +109,6 @@ struct MemberFunctionGenerator
 		}
 
 		ss << ")" << std::endl;
-		return ss.str();
-	}
-
-	static inline std::string argCheck(const std::string& tName, const std::string& uName, const std::string &message, const int n)
-	{
-		std::stringstream ss;
-		ss << indent(n) << "static_assert(rpc::isCompatible<" << tName << ", " << uName << ">(), \"" << message << "\");" << std::endl;
 		return ss.str();
 	}
 
@@ -199,7 +174,7 @@ struct MemberFunctionGenerator
 		ss << indent(n) << "inline auto " << invocationMemberFunctionName(name) << functionArgList(args, "C&& _cb");
 		ss << indent(n) << "{" << std::endl;
 		ss << argCheckList(name, args, n + 1);
-		ss << argCheck("rpc::Arg<0, C>", cppRetType, "Callback for " + name + " must take a first argument compatible with '" + refRetType + "'", n + 1);
+		ss << argCheck("rpc::Arg<0, &C::operator()>", cppRetType, "Callback for " + name + " must take a first argument compatible with '" + refRetType + "'", n + 1);
 		ss << indent(n + 1) << "return this->callWithCallback(" << callMemberName(name) << ", std::move(_cb)" << invocationArgList(args) << ");" << std::endl;
 		ss << indent(n) << "}";
 	}
@@ -214,7 +189,7 @@ struct MemberFunctionGenerator
 	) {
 		ss << indent(n) << "template<class Ret";
 
-		for(int i = 0; i < n; i++)
+		for(auto i = 0u; i < args.size(); i++)
 		{
 			ss << ", " << "class A" << std::to_string(i);
 		}
@@ -282,7 +257,11 @@ void writeClientProxy(std::stringstream& ss, const Contract& c)
 
 	std::vector<std::string> result;
 
-	std::copy(symRefs.begin(), symRefs.end(), std::back_inserter(result));
+	if(symRefs.size())
+	{
+		result.push_back(indent(1) + "template<class T> using Link = typename rpc::ClientBase<Adapter>::template OnDemand<T>;");
+		std::copy(symRefs.begin(), symRefs.end(), std::back_inserter(result));
+	}
 
 	std::stringstream ctor;
 	ctor << "public:" << std::endl;

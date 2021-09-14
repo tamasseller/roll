@@ -1,8 +1,8 @@
 #ifndef _INTEROPTEST_H_
 #define _INTEROPTEST_H_
 
-#include "RpcFdStreamAdapter.h"
 #include "RpcClient.h"
+#include "RpcFdStreamAdapter.h"
 #include "RpcStlArray.h"
 #include "RpcStlList.h"
 #include "RpcStlTuple.h"
@@ -14,51 +14,58 @@
 
 namespace syms
 {
-    static constexpr auto echo = rpc::symbol<std::string, rpc::Call<std::string>>("echo"_ctstr);
     static constexpr auto nope = rpc::symbol<>("nope"_ctstr);
-    static constexpr auto unlock = rpc::symbol<bool>("unlock"_ctstr);
+
     using Close = rpc::Call<>;
     using Read = rpc::Call<uint32_t, rpc::Call<std::list<uint16_t>>>;
     using Methods = std::tuple<Close, Read>;
     static constexpr auto open = rpc::symbol<uint8_t, uint8_t, rpc::Call<Methods>>("open"_ctstr);
 }
 
-template<class Child>
-class RpcInteropTest: public rpc::ClientBase<Child>
+using Client = InteropTestClientProxy<rpc::FdStreamAdapter>;
+
+//template<class Child, class Adapter>
+//struct InteropTestServerProxy: rpc::StlEndpoint<Adapter>
+//{
+//    using Endpoint = typename InteropTestServerProxy::StlEndpoint::Endpoint;
+//
+//    template<class... Args>
+//    InteropTestServerProxy(Args&&... args):
+//		InteropTestServerProxy::StlEndpoint(std::forward<Args>(args)...)
+//	{
+//    	{
+//			static_assert(rpc::nArgs<&Child::unlock> == 1, "Public method unlock must take 1 argument");
+//			static_assert(rpc::isCompatible<rpc::Arg<0, &Child::unlock>, bool>(), "Public method unlock must take argument #1 compatible with 'str'");
+//
+//			auto err = this->provide(InteropTestSymbols::symUnlock, [self{static_cast<Child*>(this)}](Endpoint& ep, rpc::MethodHandle h, rpc::Arg<0, &Child::unlock> doIt)
+//			{
+//				self->unlock(std::move(doIt));
+//			});
+//
+//			if(err)
+//			{
+//				rpc::fail(std::string("Registering public method unlock resulted in error ") + err);
+//			}
+//    	}
+//	}
+//};
+
+struct Service: InteropTestServerProxy<Service, rpc::FdStreamAdapter>
 {
-    rpc::OnDemand<decltype(syms::unlock)> unlockCall = syms::unlock;
-    rpc::OnDemand<decltype(syms::echo)> echoCall = syms::echo;
+	std::mutex m;
+	std::condition_variable cv;
+	volatile bool locked = true;
+	volatile int makeCnt = 0, delCnt = 0;
 
-public:
-    using RpcInteropTest::ClientBase::ClientBase;
+	using InteropTestServerProxy::InteropTestServerProxy;
+	void unlock(bool doIt);
 
-	template<class A0>
-    inline auto unlock(A0&& doIt) {
-		static_assert(rpc::isCompatible<A0, bool>(), "First argument of echo must be of type 'bool'");
-		return this->callAction(unlockCall, std::forward<A0>(doIt));
-    }
+	void wait();
 
-    template<class A0, class C>
-    inline auto echo(A0&& v, C&& c)
-    {
-    	static_assert(rpc::isCompatible<A0, rpc::CollectionPlaceholder<int8_t>>(), "First argument of echo must be of type 'str'");
-    	static_assert(rpc::isCompatible<rpc::Arg<0, C>, rpc::CollectionPlaceholder<int8_t>>(), "Callback for echo must take a first argument compatible with 'str'");
-    	return this->callWithCallback(echoCall, std::move(c), std::forward<A0>(v));
-    }
-
-    template<class Ret, class A0>
-    inline auto echo(A0&& v)
-    {
-    	static_assert(rpc::isCompatible<A0, rpc::CollectionPlaceholder<int8_t>>(), "First argument of echo must be of type 'str'");
-    	static_assert(rpc::isCompatible<Ret, rpc::CollectionPlaceholder<int8_t>>(), "Echo can only return a type compatible with 'str'");
-    	return this->template callWithPromise<Ret>(echoCall, std::forward<A0>(v));
-    }
+	std::string echo(const std::string&);
 };
 
-struct Rpc: InteropTestClientProxy<rpc::FdStreamAdapter> {
-    using Rpc::InteropTestClientProxy::InteropTestClientProxy;
-};
-
-std::thread runInteropTests(std::shared_ptr<Rpc>);
+std::thread runInteropTests(std::shared_ptr<Client>);
+std::thread runInteropListener(std::shared_ptr<Service>);
 
 #endif /* _INTEROPTEST_H_ */

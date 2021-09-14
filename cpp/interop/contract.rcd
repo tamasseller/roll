@@ -7,7 +7,10 @@ $interopTest;
 str = [i1];
 
 /* Allow remote UUT to exit (must be called before waiting unlocking) */ 
-unlock(doIt: bool);
+unlock(
+	/* Gate flag: operation is done only if this is true */
+	doIt: bool
+);
 
 /* Send an exact reply of the argument */
 echo(/* The value to be echoed */ v: str): str;

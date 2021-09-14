@@ -1,7 +1,6 @@
 #ifndef RPC_CPP_INTEROP_RPCCLIENT_H_
 #define RPC_CPP_INTEROP_RPCCLIENT_H_
 
-#include "RpcFail.h"
 #include "RpcUtility.h"
 #include "RpcEndpoint.h"
 #include "RpcStlAdapters.h"
@@ -12,63 +11,14 @@
 
 namespace rpc {
 
-/**
- * Facade for the generic RPC endpoint using STL based implementation of auxiliary operations.
- *
- * This is supposed to be the regular frontend class for PC-like environments - i.e. wherever
- * using the STL classes is advisable. This also means that dynamic memory usage is managed by
- * the STL implementation. When tighter control ver heap usage is a requirement alternate
- * implementations for the dependencies can be used.
- */
 template<class Io>
-class ClientBase:
-	public Io,
-	public Endpoint<
-		detail::StlAutoPointer,
-		detail::HashMapRegistry,
-		typename Io::InputAccessor,
-		ClientBase<Io>
-	>
+class ClientBase: StlEndpoint<Io>
 {
     friend typename ClientBase::Endpoint;
 
     volatile bool locked;
     std::mutex m;
     std::condition_variable cv;
-
-public:
-    template<class Call, class Callback, class... Args>
-    void callWithCallback(Call& call, Callback&& cb, Args&&... args)
-    {
-    	auto id = this->install([cb{std::move(cb)}](Endpoint& rpc, rpc::MethodHandle h, rpc::Arg<0, Callback> arg)
-		{
-    		cb(rpc::move(arg));
-    		rpc.uninstall(h);
-    	});
-
-    	call.call(*this, std::forward<Args>(args)..., id);
-    }
-
-    template<class Ret, class Call, class... Args>
-    std::future<Ret> callWithPromise(Call& call, Args&&... args)
-    {
-    	std::promise<Ret> p;
-    	auto f = p.get_future();
-
-    	auto id = this->install([p{std::move(p)}](Endpoint& rpc, rpc::MethodHandle h, Ret arg) mutable
-		{
-    		p.set_value(arg);
-    		rpc.uninstall(h);
-    	});
-
-    	call.call(*this, std::forward<Args>(args)..., id);
-    	return f;
-    }
-
-    template<class Call, class... Args>
-    void callAction(Call& call, Args&&... args) {
-    	call.call(*this, std::forward<Args>(args)...);
-    }
 
     inline void waitLookup()
     {
@@ -96,82 +46,114 @@ public:
 		cv.notify_all();
 	}
 
-    using Endpoint = typename ClientBase::Endpoint;
 
-    /**
-     * Wrapper around Endpoint::init.
-     */
-    template<class... Args>
-    ClientBase(Args&&... args): Io(std::forward<Args>(args)...)
+protected:
+	template<class Sym> class OnDemand
 	{
-    	if(!this->Endpoint::init())
-    	{
-    		fail("could not initialize RPC client object");
-    	}
+		volatile bool lookupDone = false;
+		typename Sym::CallType callId;
+		const Sym& sym;
+
+		template<class Rpc, class = void> struct Lock{
+			inline Lock(Rpc&) {}
+		};
+
+		template<class Rpc>
+		struct Lock<Rpc, decltype(Rpc::lock)>
+		{
+			Rpc& rpc;
+
+			Lock(Rpc& rpc): rpc(rpc)
+			{
+				rpc.lock();
+			}
+
+			~Lock()
+			{
+				rpc.unlock();
+			}
+		};
+
+	public:
+		constexpr OnDemand(const Sym& sym): sym(sym) {}
+
+		template<class Rpc, class... Args>
+		inline auto call(Rpc& rpc, Args&&... args)
+		{
+			if(lookupDone)
+			{
+				rpc.waitLookup();
+				rpc.call(this->callId, rpc::forward<Args>(args)...);
+			}
+			else
+			{
+				rpc.suspendCalls();
+				rpc.lookup(sym, [=, &rpc](auto&, bool done, auto result) mutable
+				{
+					if(done)
+					{
+						rpc.call(result, rpc::forward<Args>(args)...);
+						rpc.resumeCalls();
+
+						Lock<Rpc> _(rpc);
+						this->callId = result;
+						this->lookupDone = true;
+					}
+					else
+					{
+						fail(std::string("failed to look up symbol '") + (const char*)sym + "'");
+					}
+				});
+			}
+		}
+	};
+
+    template<class Call, class Callback, class... Args>
+    inline void callWithCallback(Call& call, Callback&& cb, Args&&... args)
+    {
+    	auto id = this->install([cb{std::move(cb)}](Endpoint& rpc, rpc::MethodHandle h, rpc::Arg<0, &Callback::operator()> arg)
+		{
+    		cb(rpc::move(arg));
+    		rpc.uninstall(h);
+    	});
+
+    	call.call(*this, std::forward<Args>(args)..., id);
     }
-};
 
-template<class Sym> class OnDemand
-{
-	volatile bool lookupDone = false;
-	typename Sym::CallType callId;
-	const Sym& sym;
+    template<class Ret, class Call, class... Args>
+    inline std::future<Ret> callWithPromise(Call& call, Args&&... args)
+    {
+    	std::promise<Ret> p;
+    	auto f = p.get_future();
 
-	template<class Rpc, class = void> struct Lock{
-		inline Lock(Rpc&) {}
-	};
-
-	template<class Rpc>
-	struct Lock<Rpc, decltype(Rpc::lock)>
-	{
-		Rpc& rpc;
-
-		Lock(Rpc& rpc): rpc(rpc)
+    	auto id = this->install([p{std::move(p)}](Endpoint& rpc, rpc::MethodHandle h, Ret arg) mutable
 		{
-			rpc.lock();
-		}
+    		p.set_value(arg);
+    		rpc.uninstall(h);
+    	});
 
-		~Lock()
-		{
-			rpc.unlock();
-		}
-	};
+    	call.call(*this, std::forward<Args>(args)..., id);
+    	return f;
+    }
+
+    template<class Call, class... Args>
+    inline void callAction(Call& call, Args&&... args) {
+    	call.call(*this, std::forward<Args>(args)...);
+    }
 
 public:
-	constexpr OnDemand(const Sym& sym): sym(sym) {}
+    using Endpoint = typename ClientBase::StlEndpoint::Endpoint;
 
-	template<class Rpc, class... Args>
-	auto call(Rpc& rpc, Args&&... args)
-	{
-		if(lookupDone)
-		{
-			rpc.waitLookup();
-			rpc.call(this->callId, rpc::forward<Args>(args)...);
-		}
-		else
-		{
-			rpc.suspendCalls();
-			rpc.lookup(sym, [=, &rpc](auto&, bool done, auto result) mutable
-			{
-				if(done)
-				{
-					rpc.call(result, rpc::forward<Args>(args)...);
-					rpc.resumeCalls();
+    using Endpoint::call;
+    using Endpoint::install;
+    using Endpoint::uninstall;
+    using Endpoint::lookup;
+    using Endpoint::provide;
+    using Endpoint::discard;
+    using Endpoint::process;
 
-					Lock<Rpc> _(rpc);
-					this->callId = result;
-					this->lookupDone = true;
-				}
-				else
-				{
-					fail(std::string("failed to look up symbol") + (const char*)sym);
-				}
-			});
-		}
-	}
+    using ClientBase::StlEndpoint::StlEndpoint;
 };
-
-template<class Sym> OnDemand(const Sym &sym) -> OnDemand<Sym>;
 
 }
 

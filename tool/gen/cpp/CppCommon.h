@@ -86,6 +86,10 @@ static inline auto invocationMemberFunctionName(const std::string& n) {
 	return detail::decapitalize(n);
 }
 
+static inline auto definitionMemberFunctionName(const std::string& n) {
+	return detail::decapitalize(n);
+}
+
 static inline auto clientProxyName(const std::string& n) {
 	return detail::capitalize(n) + detail::clientProxySuffix;
 }

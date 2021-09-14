@@ -11,6 +11,21 @@
 #include <random>
 #include <future>
 
+template<class Target>
+static inline auto startServiceThread(std::shared_ptr<Target> uut)
+{
+    return std::thread([uut]()
+	{
+        while(((rpc::FdStreamAdapter*)uut.get())->receive([&uut](auto message)
+        {    
+            if(auto a = message.access(); auto err = uut->process(a))
+                std::cerr << "RPC SRV: " << err << std::endl;
+
+            return true;
+        }));
+    });
+}
+
 static inline auto generateUniqueKey()
 {
     std::random_device r;
@@ -24,25 +39,95 @@ static inline auto generateUniqueKey()
     return ss.str();
 }
 
-static inline auto startServiceThread(std::shared_ptr<Rpc> uut)
+void Service::unlock(bool doIt)
 {
-    return std::thread([uut](){
-        while(((rpc::FdStreamAdapter*)uut.get())->receive([&uut](auto message)
-        {    
-            if(auto a = message.access(); auto err = uut->process(a))
-                std::cerr << "RPC SRV: " << err << std::endl;
-
-            return true;
-        }));
-    });
+	if(doIt)
+	{
+		std::unique_lock<std::mutex> l(m);
+		locked = false;
+		cv.notify_all();
+	}
 }
 
-static inline void runUnknownMethodLookupTest(std::shared_ptr<Rpc> uut)
+std::string Service::echo(const std::string& str) {
+	return std::move(str);
+}
+
+void Service::wait()
+{
+	for(std::unique_lock<std::mutex> l(m); locked;)
+	{
+		cv.wait(l);
+	}
+}
+
+std::thread runInteropListener(std::shared_ptr<Service> uut)
+{
+//
+//	uut->provide(syms::open, [&makeCnt, &delCnt](Client::Endpoint& h, const rpc::MethodHandle &self, uint8_t init, uint8_t modulus, rpc::Call<syms::Methods> cb)
+//	{
+//		struct State
+//		{
+//			decltype(delCnt) &dcnt;
+//			uint16_t x;
+//			const uint16_t mod;
+//			inline State(decltype(makeCnt) &makeCnt, decltype(delCnt) &delCnt, uint16_t x, uint16_t mod):
+//				dcnt(delCnt), x(x), mod(mod)
+//			{
+//				makeCnt++;
+//			}
+//
+//			inline ~State() {
+//				dcnt++;
+//			}
+//
+//			syms::Read read;
+//		};
+//
+//		auto state = std::make_shared<State>(makeCnt, delCnt, init, modulus);
+//
+//		state->read = h.install([state](Client::Endpoint& h, const rpc::MethodHandle &self, uint32_t n, rpc::Call<std::vector<uint16_t>> cb)
+//		{
+//			std::vector<uint16_t> ret;
+//			ret.reserve(n);
+//
+//			while(n--)
+//			{
+//				ret.push_back(state->x);
+//				state->x = state->x * state->x % state->mod;
+//			}
+//
+//			return h.call(cb, ret);
+//		});
+//
+//		auto close = h.install([state](Client::Endpoint& h, const rpc::MethodHandle &self)
+//		{
+//			if(auto err = h.uninstall(state->read))
+//				return err;
+//
+//			return h.uninstall(self);
+//		});
+//
+//		return h.call(cb, syms::Methods(close, state->read));
+//	});
+
+	auto t = startServiceThread(uut);
+
+	uut->wait();
+
+//    assert(makeCnt > 0);
+    assert(uut->delCnt == uut->makeCnt);
+
+    return t;
+}
+
+
+static inline void runUnknownMethodLookupTest(std::shared_ptr<Client> uut)
 {
 	std::promise<bool> p;
 	auto ret = p.get_future();
 
-	const char* err = uut->Endpoint::lookup(syms::nope, [p{std::move(p)}](auto&, bool done, auto) mutable { p.set_value(done); });
+	const char* err = uut->lookup(syms::nope, [p{std::move(p)}](auto&, bool done, auto) mutable { p.set_value(done); });
 	assert(err == nullptr);
 
 	bool failed = ret.get() == false;
@@ -50,7 +135,7 @@ static inline void runUnknownMethodLookupTest(std::shared_ptr<Rpc> uut)
     assert(failed);
 }
 
-static inline void runEchoTest(std::shared_ptr<Rpc> uut)
+static inline void runEchoTest(std::shared_ptr<Client> uut)
 {
 	bool done = false;
 
@@ -122,71 +207,11 @@ static inline void runEchoTest(std::shared_ptr<Rpc> uut)
 //    tc2.close(uut);
 //}
 
-std::thread runInteropTests(std::shared_ptr<Rpc> uut)
+std::thread runInteropTests(std::shared_ptr<Client> uut)
 {
-    uut->provide(syms::echo, [](Rpc::Endpoint& h, const rpc::MethodHandle &self, const std::string &str, rpc::Call<std::string> cb) {
-        return h.call(cb, str);
-    });
+	auto t = startServiceThread(uut);
 
-    volatile bool locked = true;
-    volatile int makeCnt = 0, delCnt = 0;
-
-    uut->provide(syms::unlock, [&locked](Rpc::Endpoint& h, const rpc::MethodHandle &self, bool doIt)
-    {
-        if(doIt)
-            locked = false;
-    });
-
-    uut->provide(syms::open, [&makeCnt, &delCnt](Rpc::Endpoint& h, const rpc::MethodHandle &self, uint8_t init, uint8_t modulus, rpc::Call<syms::Methods> cb)
-    {
-        struct State
-        {
-            decltype(delCnt) &dcnt;
-            uint16_t x;
-            const uint16_t mod;
-            inline State(decltype(makeCnt) &makeCnt, decltype(delCnt) &delCnt, uint16_t x, uint16_t mod): 
-                dcnt(delCnt), x(x), mod(mod)
-            {
-                makeCnt++;
-            }
-
-            inline ~State() {
-                dcnt++;
-            }
-
-            syms::Read read;
-        };
-
-        auto state = std::make_shared<State>(makeCnt, delCnt, init, modulus);
-
-        state->read = h.install([state](Rpc::Endpoint& h, const rpc::MethodHandle &self, uint32_t n, rpc::Call<std::vector<uint16_t>> cb)
-        {
-            std::vector<uint16_t> ret;
-            ret.reserve(n);
-
-            while(n--)
-            {
-                ret.push_back(state->x);
-                state->x = state->x * state->x % state->mod;
-            }
-
-            return h.call(cb, ret);
-        });
-
-        auto close = h.install([state](Rpc::Endpoint& h, const rpc::MethodHandle &self)
-        {
-            if(auto err = h.uninstall(state->read))
-                return err;
-
-            return h.uninstall(self);
-        });
-
-        return h.call(cb, syms::Methods(close, state->read));
-    });
-
-    auto t = startServiceThread(uut);
-
-    uut->unlock(false);
+	uut->unlock(false);
 
     runUnknownMethodLookupTest(uut);
     runEchoTest(uut);
@@ -194,10 +219,6 @@ std::thread runInteropTests(std::shared_ptr<Rpc> uut)
 
     uut->unlock(true);
 
-    while(locked) std::this_thread::yield();
-
-//    assert(makeCnt > 0);
-    assert(delCnt == makeCnt);
-    
     return t;
 }
+

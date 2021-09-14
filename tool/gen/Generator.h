@@ -8,14 +8,13 @@
 struct CodeGen
 {
 	inline virtual ~CodeGen() = default;
-	virtual std::string generateClient(const std::vector<Contract>&) const = 0;
-	virtual std::string generateServer(const std::vector<Contract>&) const = 0;
+	virtual std::string generate(const std::vector<Contract>& ast, bool generateClientProxy, bool generateServiceProxy) const = 0;
 };
 
 struct GeneratorOptions
 {
 	const CodeGen* language;
-	std::string (CodeGen::* direction)(const std::vector<Contract>&) const = &CodeGen::generateClient;
+	bool doClient = true, doService = true;
 
 	void select(const std::string &str);
 
@@ -27,25 +26,22 @@ public:
 	{
 		h->addOptions({"-l", "--lang", "--source-language"}, "Set source language to generate code for [default: c++]", [this](const std::string &str)
 		{
-
+			select(str);
 		});
 
-		h->addOptions({"-c", "--client"}, "Generate RPC adapters for client side [default]", [this]()
+		h->addOptions({"-nc", "--no-client"}, "Do not generate RPC adapters for client side [default: do it]", [this]()
 		{
-			this->direction = &CodeGen::generateClient;
+			this->doClient = false;
 		});
 
-		h->addOptions({"-s", "--server"}, "Generate RPC adapters for server side [default]", [this]()
+		h->addOptions({"-ns", "--no-service"}, "Do not generate RPC adapters for server side [default: do it]", [this]()
 		{
-			this->direction = &CodeGen::generateServer;
+			this->doService = false;
 		});
 	}
 
-	inline std::string invokeGenerator(const std::vector<Contract>& ast)
-	{
-		std::stringstream ss;
-		ss << (language->*direction)(ast);
-		return ss.str();
+	inline std::string invokeGenerator(const std::vector<Contract>& ast) {
+		return language->generate(ast, doClient, doService);
 	}
 };
 

@@ -7,41 +7,35 @@
 
 const CodeGenCpp CodeGenCpp::instance;
 
-void writeCommonHeader(std::stringstream &ss)
+std::string CodeGenCpp::generate(const std::vector<Contract>& cs, bool doClient, bool doService) const
 {
+	std::stringstream ss;
 	ss << "#include \"RpcCall.h\"" << std::endl;
 	ss << "#include \"RpcSymbol.h\"" << std::endl;
 	ss << "#include \"RpcStruct.h\"" << std::endl;
 	ss << "#include \"RpcTypeInfo.h\"" << std::endl;
-}
 
-template<void (*directionSpecific)(std::stringstream&, const Contract&)>
-void generateSource(std::stringstream &ss, const std::vector<Contract>& cs)
-{
+	if(doClient)
+	{
+		ss << "#include \"RpcClient.h\"" << std::endl << std::endl;
+	}
+
 	for(const auto& c: cs)
 	{
 		writeContractTypes(ss, c);
 		writeStructTypeInfo(ss, c);
 		writeContractSymbols(ss, c);
-		directionSpecific(ss, c);
+
+		if(doClient)
+		{
+			writeClientProxy(ss, c);
+		}
+
+		if(doService)
+		{
+			writeServerProxy(ss, c);
+		}
 	}
-}
 
-std::string CodeGenCpp::generateClient(const std::vector<Contract>& cs) const
-{
-	std::stringstream ss;
-	writeCommonHeader(ss);
-	ss << "#include \"RpcClient.h\"" << std::endl << std::endl;
-
-	generateSource<writeClientProxy>(ss, cs);
-	return ss.str();
-}
-
-std::string CodeGenCpp::generateServer(const std::vector<Contract>& cs) const
-{
-	std::stringstream ss;
-	writeCommonHeader(ss);
-	ss << std::endl;
-	generateSource<writeServerProxy>(ss, cs);
 	return ss.str();
 }

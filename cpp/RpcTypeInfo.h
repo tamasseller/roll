@@ -41,6 +41,12 @@ template<class T, char prefix> struct PrimitveIntegerTypeInfoBase
 	static constexpr inline bool isConstSize() { return true; }
 };
 
+
+template<> struct TypeInfo<void>
+{
+	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { return s; }
+};
+
 /**
  * Serialization rules for char values.
  * 

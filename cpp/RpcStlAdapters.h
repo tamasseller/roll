@@ -1,12 +1,15 @@
 #ifndef RPC_CPP_RPCSTLADAPTERS_H_
 #define RPC_CPP_RPCSTLADAPTERS_H_
 
+#include "RpcFail.h"
+#include "RpcEndpoint.h"
+
 #include <memory>
 #include <sstream>
 #include <unordered_map>
 #include <mutex>
 
-#include <assert.h>
+#include <cassert>
 
 namespace rpc {
 
@@ -164,6 +167,38 @@ namespace detail
         }
     };
 }
+
+/**
+ * Facade for the generic RPC endpoint using STL based implementation of auxiliary operations.
+ *
+ * This is supposed to be the regular front-end class for PC-like environments - i.e. wherever
+ * using the STL classes is advisable. This also means that dynamic memory usage is managed by
+ * the STL implementation. When tighter control over heap usage is a requirement alternate
+ * implementations for the dependencies can be used.
+ */
+template<class Io>
+class StlEndpoint:
+	public Io,
+	public Endpoint<
+		detail::StlAutoPointer,
+		detail::HashMapRegistry,
+		typename Io::InputAccessor,
+		StlEndpoint<Io>
+	>
+{
+public:
+    /**
+     * Wrapper around Endpoint::init.
+     */
+    template<class... Args>
+    StlEndpoint(Args&&... args): Io(std::forward<Args>(args)...)
+	{
+    	if(!this->StlEndpoint::Endpoint::init())
+    	{
+    		fail("could not initialize RPC endpoint object");
+    	}
+    }
+};
 
 }
 

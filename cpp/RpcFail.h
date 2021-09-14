@@ -1,14 +1,16 @@
 #ifndef RPC_CPP_INTEROP_RPCFAIL_H_
 #define RPC_CPP_INTEROP_RPCFAIL_H_
 
-namespace rpc {
 
 #ifdef __EXCEPTIONS
 /**
  * RPC specific exception object.
  */
 
+#include <string>
 #include <exception>
+
+namespace rpc {
 
 class RpcException: public std::exception
 {
@@ -26,11 +28,15 @@ static inline void fail(const std::string& str) {
 	throw RpcException(str);
 }
 
+}
+
+
 #else
 
 #include <iostream>
-
 #include <stdlib.h>
+
+namespace rpc {
 
 static inline void fail(const std::string& str)
 {
@@ -38,8 +44,9 @@ static inline void fail(const std::string& str)
 	abort();
 }
 
+}
+
 #endif
 
-}
 
 #endif /* RPC_CPP_INTEROP_RPCFAIL_H_ */
