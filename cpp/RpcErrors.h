@@ -4,7 +4,7 @@
 namespace rpc
 {
     /**
-     * All possible error strings logged by the RPC engine.
+     * All possible error strings produced by the RPC engine.
      */
     struct Errors
     {
@@ -25,6 +25,8 @@ namespace rpc
 
         static constexpr const char *wrongMethodRequest = "wrong method request";
         static constexpr const char *messageFormatError = "message format error";
+
+        static constexpr const char *sessionNotOpen= "the session is not functional (yet/anymore)";
     };
 }
 

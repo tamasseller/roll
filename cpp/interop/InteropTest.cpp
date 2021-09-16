@@ -5,11 +5,15 @@
 #include "RpcStlTuple.h"
 #include "RpcClient.h"
 #include "RpcStreamReader.h"
+#include "Tcp.h"
 
 #include <iostream>
 #include <string>
 #include <random>
 #include <future>
+
+static constexpr uint16_t defaultInitial = 2;
+static constexpr uint16_t defaultModulus = 19;
 
 template<class Target>
 static inline auto startServiceThread(std::shared_ptr<Target> uut)
@@ -39,95 +43,99 @@ static inline auto generateUniqueKey()
     return ss.str();
 }
 
-void Service::unlock(bool doIt)
+struct Service: XXX<Service, rpc::FdStreamAdapter>
 {
-	if(doIt)
+	using XXX::XXX;
+	std::mutex m;
+	std::condition_variable cv;
+	volatile bool locked = true;
+	volatile int makeCnt = 0, delCnt = 0;
+
+	struct StreamSession: InteropTestStreamServerSession<StreamSession>
 	{
-		std::unique_lock<std::mutex> l(m);
-		locked = false;
-		cv.notify_all();
+		Service* srv;
+
+		uint16_t x;
+		const uint16_t mod;
+
+		StreamSession(Service* srv, uint8_t initial, uint8_t modulus):
+			srv(srv), x(initial), mod(modulus)
+		{
+			srv->makeCnt++;
+		}
+
+		~StreamSession() {
+			srv->delCnt--;
+		}
+
+		void generate(uint32_t nData)
+		{
+			std::vector<uint16_t> ret;
+			ret.reserve(nData);
+
+			while(nData--)
+			{
+				ret.push_back(x);
+				x = x * x % mod;
+			}
+
+			takeResult(srv, ret);
+		}
+	};
+
+	std::pair<std::string, std::shared_ptr<StreamSession>> open(uint8_t initial, uint8_t modulus) {
+		return {"asd", std::make_shared<Service::StreamSession>(this, initial, modulus)};
 	}
-}
 
-std::string Service::echo(const std::string& str) {
-	return std::move(str);
-}
+	std::shared_ptr<StreamSession> openDefault() {
+		return std::make_shared<Service::StreamSession>(this, defaultInitial, defaultModulus);
+	}
 
-void Service::wait()
-{
-	for(std::unique_lock<std::mutex> l(m); locked;)
+	void unlock(bool doIt)
 	{
-		cv.wait(l);
+		if(doIt)
+		{
+			std::unique_lock<std::mutex> l(m);
+			locked = false;
+			cv.notify_all();
+		}
 	}
-}
 
-std::thread runInteropListener(std::shared_ptr<Service> uut)
+	std::string echo(const std::string& str) {
+		return std::move(str);
+	}
+
+	void wait()
+	{
+		for(std::unique_lock<std::mutex> l(m); locked;)
+		{
+			cv.wait(l);
+		}
+	}
+};
+
+void runInteropListener(int sock)
 {
-//
-//	uut->provide(syms::open, [&makeCnt, &delCnt](Client::Endpoint& h, const rpc::MethodHandle &self, uint8_t init, uint8_t modulus, rpc::Call<syms::Methods> cb)
-//	{
-//		struct State
-//		{
-//			decltype(delCnt) &dcnt;
-//			uint16_t x;
-//			const uint16_t mod;
-//			inline State(decltype(makeCnt) &makeCnt, decltype(delCnt) &delCnt, uint16_t x, uint16_t mod):
-//				dcnt(delCnt), x(x), mod(mod)
-//			{
-//				makeCnt++;
-//			}
-//
-//			inline ~State() {
-//				dcnt++;
-//			}
-//
-//			syms::Read read;
-//		};
-//
-//		auto state = std::make_shared<State>(makeCnt, delCnt, init, modulus);
-//
-//		state->read = h.install([state](Client::Endpoint& h, const rpc::MethodHandle &self, uint32_t n, rpc::Call<std::vector<uint16_t>> cb)
-//		{
-//			std::vector<uint16_t> ret;
-//			ret.reserve(n);
-//
-//			while(n--)
-//			{
-//				ret.push_back(state->x);
-//				state->x = state->x * state->x % state->mod;
-//			}
-//
-//			return h.call(cb, ret);
-//		});
-//
-//		auto close = h.install([state](Client::Endpoint& h, const rpc::MethodHandle &self)
-//		{
-//			if(auto err = h.uninstall(state->read))
-//				return err;
-//
-//			return h.uninstall(self);
-//		});
-//
-//		return h.call(cb, syms::Methods(close, state->read));
-//	});
-
+	auto uut = std::make_shared<Service>(sock, sock);
 	auto t = startServiceThread(uut);
 
 	uut->wait();
 
-//    assert(makeCnt > 0);
-    assert(uut->delCnt == uut->makeCnt);
+    assert(uut->makeCnt > 0);
+    //assert(uut->delCnt == uut->makeCnt);
 
-    return t;
+    closeNow(sock);
+    t.join();
 }
-
 
 static inline void runUnknownMethodLookupTest(std::shared_ptr<Client> uut)
 {
+    static constexpr auto nope = rpc::symbol<>("nope"_ctstr);
+
 	std::promise<bool> p;
 	auto ret = p.get_future();
 
-	const char* err = uut->lookup(syms::nope, [p{std::move(p)}](auto&, bool done, auto) mutable { p.set_value(done); });
+	const char* err = uut->lookup(nope, [p{std::move(p)}](auto&, bool done, auto) mutable { p.set_value(done); });
 	assert(err == nullptr);
 
 	bool failed = ret.get() == false;
@@ -161,64 +169,92 @@ static inline void runEchoTest(std::shared_ptr<Client> uut)
     assert(done);
 }
 
-//static inline void runStreamGeneratorTest(std::shared_ptr<Rpc> uut)
-//{
-//    auto open = uut->lookupFuture(syms::open).get();
-//
-//    struct Tester
-//    {
-//        uint16_t state;
-//        const uint16_t mod;
-//        syms::Methods methods;
-//
-//        void runTest(decltype(uut)& uut)
-//        {
-//            int idx = 0;
-//            for(auto v: uut->asyncCall(std::get<1>(methods), 5u).get())
-//            {
-//                idx++;
-//                assert(v == state);
-//                state = state * state % mod;
-//            }
-//            assert(idx == 5);
-//        }
-//
-//        void close(decltype(uut)& uut) {
-//            uut->simpleCall(std::get<0>(methods));
-//        }
-//    };
-//
-//    Tester tc1{3, 31, uut->asyncCall(open, uint8_t(3), uint8_t(31)).get()};
-//    Tester tc2{5, 17, uut->asyncCall(open, uint8_t(5), uint8_t(17)).get()};
-//
-//    for(int i = 0; i<10; i++)
-//        tc1.runTest(uut);
-//
-//    for(int i = 0; i<5; i++)
-//        tc2.runTest(uut);
-//
-//    for(int i = 0; i<7; i++)
-//    {
-//        tc1.runTest(uut);
-//        tc2.runTest(uut);
-//    }
-//
-//    tc1.close(uut);
-//    tc2.close(uut);
-//}
-
-std::thread runInteropTests(std::shared_ptr<Client> uut)
+struct ClientStream: InteropTestStreamClientSession<ClientStream>
 {
-	auto t = startServiceThread(uut);
+	uint16_t state = defaultInitial;
+	const uint16_t mod = defaultModulus;
 
+	int n = 0;
+	std::mutex m;
+	std::condition_variable cv;
+
+	ClientStream() = default;
+	ClientStream(uint16_t state, uint16_t mod): state(state), mod(mod) {}
+
+	void takeResult(const std::vector<uint16_t> &data)
+	{
+		for(const auto& v: data)
+		{
+			assert(v == state);
+			state = state * state % mod;
+		}
+
+		assert(data.size() == 5);
+
+		{
+			std::lock_guard _(m);
+			n++;
+			cv.notify_all();
+		}
+	}
+
+	void wait(int n)
+	{
+		std::unique_lock<std::mutex> l(m);
+
+		while(this->n != n)
+		{
+			cv.wait(l);
+		}
+	}
+};
+
+static inline void runStreamGeneratorTest(std::shared_ptr<Client> uut)
+{
+    auto s = std::make_shared<ClientStream>(3, 31);
+    uut->open(s, uint8_t(3), uint8_t(31), [&s, &uut](std::string ret)
+	{
+    	assert(ret == "asd");
+
+    	for(int i = 0; i < 3; i++)
+		{
+    		s->generate(uut, uint32_t(5));
+		}
+    });
+
+    auto t = std::make_shared<ClientStream>();
+    uut->openDefault(t, [&t, &uut]() {
+   		t->generate(uut, uint32_t(5));
+    });
+
+    auto u = std::make_shared<ClientStream>();
+    uut->openDefault(u).get();
+    u->generate(uut, uint32_t(5));
+
+    auto v = std::make_shared<ClientStream>(5, 17);
+    auto str = uut->open<std::string>(v, uint8_t(5), uint8_t(17)).get();
+    assert(str == "asd");
+    v->generate(uut, uint32_t(5));
+
+    s->wait(3);
+    t->wait(1);
+    u->wait(1);
+    v->wait(1);
+}
+
+void runInteropTests(int sock)
+{
+	auto uut = std::make_shared<Client>(sock, sock);
+	auto t = startServiceThread(uut);
 	uut->unlock(false);
 
     runUnknownMethodLookupTest(uut);
     runEchoTest(uut);
-    //    runStreamGeneratorTest(uut);
+    runStreamGeneratorTest(uut);
 
     uut->unlock(true);
 
-    return t;
+    closeNow(sock);
+    t.join();
 }
 

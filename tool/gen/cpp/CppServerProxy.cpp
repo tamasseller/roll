@@ -25,7 +25,7 @@ namespace ServiceBuilderGenerator
 	{
 		std::stringstream ss;
 
-		ss << "auto err = this->provide(" << symName << "[self{static_cast<Child*>(this)}](Endpoint& ep, rpc::MethodHandle h";
+		ss << "auto err = this->provide(" << symName << ", [self{static_cast<Child*>(this)}](Endpoint& ep, rpc::MethodHandle h";
 
 		for(auto i = 0u; i < args.size(); i++)
 		{
@@ -61,24 +61,6 @@ namespace ServiceBuilderGenerator
 		return ss.str();
 	}
 
-//	static inline void InvokeLine(
-//			std::stringstream &ss,
-//		const std::string &defName,
-//			const std::vector<Contract::Var>& args,
-//			const int n,
-//			std::optional<std::string> extra = {})
-//	{
-//		ss << std::endl << indent(n + 1) << "auto err = this->provide(" << symName << "[self{static_cast<Child*>(this)}](Endpoint& ep, rpc::MethodHandle h";
-//		writeArgDefs(ss, defName, args);
-//
-//		if(extra.has_value())
-//		{
-//			ss << ", " << *extra;
-//		}
-//
-//		ss << ")" << std::endl;
-//	}
-
 	static inline void handleItem(std::vector<std::string> &ret, const Contract::Function &f, const std::string& cName, const int n)
 	{
 		std::stringstream ss;
@@ -90,11 +72,11 @@ namespace ServiceBuilderGenerator
 
 		ss << indent(n + 1) << "static_assert(rpc::nArgs<&Child::" << defName << "> == " << count << ", "
 			<< "\"Public method " << f.name << " must take " << count << " argument"
-			<< ((count > 0) ? "s" : "") << "\");" << std::endl;
+			<< ((count > 1) ? "s" : "") << "\");" << std::endl;
 
 		writeArgsCheckList(ss, f, cName, n + 1);
 
-		const auto symName = contractSymbolsNamespaceName(cName) + "::" + symbolName(f.name);
+		const auto symName = contractSymbolsBlockNameRef(cName) + "::" + symbolName(f.name);
 
 		if(!f.returnType.has_value())
 		{
@@ -148,18 +130,18 @@ namespace ServiceBuilderGenerator
 
 void writeServerProxy(std::stringstream& ss, const Contract& c)
 {
-	const auto n = serverProxyName(c.name);
-	const auto header = "template<class Child, class Adapter>\nstruct " + n + ": rpc::StlEndpoint<Adapter>";
-
-	std::vector<std::string> result;
-	result.push_back(indent(1) + "using Endpoint = typename " + n + "::StlEndpoint::Endpoint;");
+	const auto n = contractServerProxyNameDef(c.name);
 
 	auto ctor = ServiceBuilderGenerator::generateCtor(c, n);
 	if(ctor.length())
 	{
-		result.push_back(ctor);
-	}
+		ss << printDocs(c.docs, 0);
 
-	printDocs(ss, c.docs, 0);
-	writeTopLevelBlock(ss, header, result, true);
+		const auto header = "template<class Child, class Adapter>\nstruct " + contractServerProxyNameRef(c.name) + ": rpc::StlEndpoint<Adapter>";
+
+		std::vector<std::string> result;
+		result.push_back(indent(1) + "using Endpoint = typename " + n + "::StlEndpoint::Endpoint;");
+		result.push_back(ctor);
+		writeTopLevelBlock(ss, header, result);
+	}
 }

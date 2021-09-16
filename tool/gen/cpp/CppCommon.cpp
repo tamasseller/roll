@@ -1,7 +1,8 @@
 #include "CppCommon.h"
 
-void printDocs(std::stringstream &ss, const std::string& str, const int n)
+std::string printDocs(const std::string& str, const int n)
 {
+	std::stringstream ss;
 	if(str.length())
 	{
 		std::stringstream in(str);
@@ -46,9 +47,11 @@ void printDocs(std::stringstream &ss, const std::string& str, const int n)
 
 		ss << " */" << std::endl;
 	}
+
+	return ss.str();
 }
 
-bool writeBlock(std::stringstream& ss, const std::string header, const std::vector<std::string>& strs, const int n)
+bool writeBlock(std::stringstream& ss, const std::string &header, const std::vector<std::string>& strs, const int n)
 {
 	bool first = true;
 	bool prevMultiLine;
@@ -86,15 +89,10 @@ bool writeBlock(std::stringstream& ss, const std::string header, const std::vect
 	return false;
 }
 
-void writeTopLevelBlock(std::stringstream& ss, const std::string header, const std::vector<std::string>& strs, bool addSemicolon)
+void writeTopLevelBlock(std::stringstream& ss, const std::string &header, const std::vector<std::string>& strs, bool addSemi)
 {
 	if(writeBlock(ss, header, strs, 0))
 	{
-		if(addSemicolon)
-		{
-			ss << ";";
-		}
-
-		ss << std::endl << std::endl;
+		ss << (addSemi ? ";" : "") << std::endl << std::endl;
 	}
 }

@@ -6,7 +6,7 @@
 static inline std::string cppTypeRef(const Contract::Primitive& p, const std::string& cName) { return cppPrimitive(p); }
 
 static inline std::string cppTypeRef(const std::string &n, const std::string& cName) {
-	return contractTypesNamespaceName(cName) + "::" + userTypeName(n);
+	return contractTypeBlockNameRef(cName) + "::" + userTypeName(n);
 }
 
 static inline std::string cppTypeRef(const Contract::Collection &c, const std::string& cName) {

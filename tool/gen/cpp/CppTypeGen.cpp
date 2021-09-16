@@ -7,9 +7,8 @@
 
 struct CommonTypeGenerator
 {
-	static inline std::string handleTypeRef(const Contract::Primitive& p) { return cppPrimitive(p); }
-
 	static inline std::string handleTypeRef(const std::string &n) { return userTypeName(n); }
+	static inline std::string handleTypeRef(const Contract::Primitive& p) { return cppPrimitive(p); }
 
 	static inline std::string handleTypeRef(const Contract::Collection &c) {
 		return "rpc::CollectionPlaceholder<" + std::visit([](const auto& e){return handleTypeRef(e);}, *c.elementType) + ">";
@@ -17,31 +16,19 @@ struct CommonTypeGenerator
 
 	static inline std::string handleTypeDef(const std::string& name, const Contract::Aggregate& a, const int n)
 	{
-		std::stringstream ss;
-		ss << indent(n) << "struct " << userTypeName(name) << std::endl;
-		ss << indent(n) << "{" << std::endl;
+		std::vector<std::string> result;
 
-		bool first = true;
 		for(const auto& v: a.members)
 		{
-			if(first)
-			{
-				first = false;
-			}
-			else
-			{
-				if(v.docs.length())
-				{
-					ss << std::endl;
-				}
-			}
-
-			printDocs(ss, v.docs, n + 1);
+			std::stringstream ss;
+			ss << printDocs(v.docs, n + 1);
 			ss << indent(n + 1) << std::visit([](const auto& i){ return handleTypeRef(i); }, v.type);
-			ss << " " << aggregateMemberName(v.name) << ";" << std::endl;
+			ss << " " << aggregateMemberName(v.name) << ";";
+			result.push_back(ss.str());
 		}
 
-		ss << indent(n) << "}";
+		std::stringstream ss;
+		writeBlock(ss, "struct " + userTypeName(name), result, n);
 		return ss.str();
 	}
 
@@ -137,7 +124,7 @@ struct CommonTypeGenerator
 	static inline std::string handleSessionItemInitial(SessionCalls &calls, const std::string& docs, const Contract::Session::ForwardCall &f, const int n)
 	{
 		std::stringstream ss;
-		printDocs(ss, docs, n);
+		ss << printDocs(docs, n);
 		const auto typeName = sessionForwardCallSignatureTypeName(f.name);
 		ss << signature(typeName, toSignArgList(f.args), n);
 		calls.fwd.push_back({f.name, typeName});
@@ -147,101 +134,92 @@ struct CommonTypeGenerator
 	static inline std::string handleSessionItemInitial(SessionCalls &calls, const std::string& docs, const Contract::Session::CallBack & cb, const int n)
 	{
 		std::stringstream ss;
-		printDocs(ss, docs, n);
+		ss << printDocs(docs, n);
 		const auto typeName = sessionCallbackSignatureTypeName(cb.name);
 		ss << signature(typeName, toSignArgList(cb.args), n);
 		calls.bwd.push_back({cb.name, typeName});
 		return ss.str();
 	}
 
-	static inline std::string handleSessionItemFinal(SessionCalls &calls, const std::string& docs, const Contract::Session::Ctor & c, const int n)
+	static inline std::string handleSessionItemFinal(const std::string& sName, const std::string& docs, const Contract::Session::Ctor & c, const int n)
 	{
 		std::stringstream ss;
-		printDocs(ss, docs, n);
-
-		auto fwdArgs = toSignArgList(c.args);
-		std::copy(calls.bwd.begin(), calls.bwd.end(), std::back_inserter(fwdArgs));
-		ss << signature(sessionCreateSignatureTypeName(c.name), fwdArgs, n) << std::endl;
+		ss << printDocs(docs, n);
 
 		std::vector<std::array<std::string, 2>> bwdArgs;
 		if(c.returnType)
 		{
-			bwdArgs.push_back(toSgnArg({"retval", *c.returnType, ""}));
+			bwdArgs.push_back(toSgnArg({"_retval", *c.returnType, ""}));
 		}
 
-		ss << signature(sessionAcceptSignatureTypeName(c.name), bwdArgs, n);
+		bwdArgs.push_back({"_exports", sessionCallExportTypeName(sName)});
+
+		ss << signature(sessionAcceptSignatureTypeName(c.name), bwdArgs, n) << std::endl;
+
+		auto fwdArgs = toSignArgList(c.args);
+		fwdArgs.push_back({"_exports", sessionCallbackExportTypeName(sName)});
+		fwdArgs.push_back({"_accept", sessionAcceptSignatureTypeName(c.name)});
+
+		ss << signature(sessionCreateSignatureTypeName(c.name), fwdArgs, n);
+
 		return ss.str();
 	}
 
-	static inline std::string handleSessionItemFinal(SessionCalls &calls, const std::string& docs, const Contract::Session::ForwardCall&, const int n) { return {}; }
-	static inline std::string handleSessionItemFinal(SessionCalls &calls, const std::string& docs, const Contract::Session::CallBack&, const int n) { return {}; }
+	static inline std::string handleSessionItemFinal(const std::string& sName, const std::string& docs, const Contract::Session::ForwardCall&, const int n) { return {}; }
+	static inline std::string handleSessionItemFinal(const std::string& sName, const std::string& docs, const Contract::Session::CallBack&, const int n) { return {}; }
+
+	static inline std::string sessionExports(const std::string& name, const std::vector<std::array<std::string, 2>> &d, const int n)
+	{
+		std::vector<std::string> result;
+
+		std::transform(d.begin(), d.end(), std::back_inserter(result), [n](const auto &i){
+			return indent(n + 1) + i[1] + " " + i[0] + ";";
+		});
+
+		std::stringstream ss;
+
+		if(writeBlock(ss, "struct " + name, result, n))
+		{
+			ss << ";";
+		}
+
+		return ss.str();
+	}
 
 	static inline std::string handleItem(const Contract::Session &s, const int n)
 	{
-		std::stringstream ss;
+		std::vector<std::string> result;
 
 		SessionCalls scs;
 
-		ss << indent(n) << "namespace " << sessionNamespaceName(s.name) << std::endl;
-		ss << indent(n) << "{" << std::endl;
-
-		bool first = true;
-		for(const auto& it: s.items)
-		{
-			const auto str = std::visit([&scs, n, docs{it.first}](const auto& i){ return handleSessionItemInitial(scs, docs, i, n + 1); }, it.second);
-
-			if(str.length())
-			{
-				if(first)
-				{
-					first = false;
-				}
-				else
-				{
-					ss << std::endl;
-				}
-
-				ss << str << std::endl;
-			}
+		for(const auto& it: s.items) {
+			result.push_back(std::visit([&scs, n, docs{it.first}](const auto& i){ return handleSessionItemInitial(scs, docs, i, n + 1); }, it.second));
 		}
 
-		for(const auto& it: s.items)
-		{
-			const auto str = std::visit([&scs, n, docs{it.first}](const auto& i){ return handleSessionItemFinal(scs, docs, i, n + 1); }, it.second);
+		result.push_back(sessionExports(sessionCallExportTypeName(s.name), scs.fwd, n + 1));
+		result.push_back(sessionExports(sessionCallbackExportTypeName(s.name), scs.bwd, n + 1));
 
-			if(str.length())
-			{
-				ss << std::endl << str << std::endl;
-			}
+		for(const auto& it: s.items) {
+			result.push_back(std::visit([&s, n, docs{it.first}](const auto& i){ return handleSessionItemFinal(s.name, docs, i, n + 1); }, it.second));
 		}
 
-		ss << indent(n) << "};";
-
+		std::stringstream ss;
+		writeBlock(ss, "struct " + sessionNamespaceName(s.name), result, n);
+		ss << ";";
 		return ss.str();
 	}
 };
 
 void writeContractTypes(std::stringstream &ss, const Contract& c)
 {
-	printDocs(ss, c.docs, 0);
-	ss << "namespace " << contractTypesNamespaceName(c.name) << std::endl;
-	ss << "{" << std::endl;
-
-	bool first = true;
+	std::vector<std::string> result;
 	for(const auto& i: c.items)
 	{
-		if(first)
-		{
-			first = false;
-		}
-		else
-		{
-			ss << std::endl;
-		}
-
-		printDocs(ss, i.first, 1);
-		ss << std::visit([](const auto& i){ return CommonTypeGenerator::handleItem(i, 1); }, i.second) << std::endl;
+		std::stringstream ss;
+		ss << printDocs(i.first, 1);
+		ss << std::visit([](const auto& i){ return CommonTypeGenerator::handleItem(i, 1); }, i.second);
+		result.push_back(ss.str());
 	}
 
-	ss << "}" << std::endl << std::endl;
+	writeTopLevelBlock(ss, printDocs(c.docs, 0) + "struct " + contractTypeBlockNameRef(c.name), result);
 }

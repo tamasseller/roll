@@ -25,20 +25,14 @@ int main(int argc, const char* argv[])
 
     try
     {
-        const auto sock = srv ? listen(port) : connect("127.0.0.1", port);
-        std::thread t;
-
         if(srv)
         {
-        	t = runInteropListener(std::make_shared<Service>(sock, sock));
+        	runInteropListener(listen(port));
         }
         else
         {
-        	t = runInteropTests(std::make_shared<Client>(sock, sock));
+        	runInteropTests(connect("127.0.0.1", port));
         }
-
-        closeNow(sock);
-        t.join();
 
         std::cout << "testing completed successfully" << std::endl;
         return 0;

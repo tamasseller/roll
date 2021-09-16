@@ -37,7 +37,8 @@ struct CommonSymbolGenerator
 			return std::visit([n, t](const auto& i){ return handleSessionItem(t, i, n + 1); }, it.second);
 		});
 
-		writeBlock(ss, "namespace " + sessionNamespaceName(s.name), strs, n);
+		writeBlock(ss, "struct " + sessionNamespaceName(s.name), strs, n);
+		ss << ";";
 		return ss.str();
 	}
 };
@@ -46,9 +47,9 @@ void writeContractSymbols(std::stringstream &ss, const Contract& c)
 {
 	std::vector<std::string> strs;
 
-	std::transform(c.items.begin(), c.items.end(), std::back_inserter(strs), [&c, t{contractTypesNamespaceName(c.name)}](const auto &i){
+	std::transform(c.items.begin(), c.items.end(), std::back_inserter(strs), [&c, t{contractTypeBlockNameRef(c.name)}](const auto &i){
 		return std::visit([&c, t](const auto& i){ return CommonSymbolGenerator::handleItem(t, i, 1); }, i.second);
 	});
 
-	writeTopLevelBlock(ss, "namespace " + contractSymbolsNamespaceName(c.name), strs, false);
+	writeTopLevelBlock(ss, "struct " + contractSymbolsBlockNameRef(c.name), strs);
 }

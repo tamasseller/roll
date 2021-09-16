@@ -21,6 +21,7 @@ SOURCES += gen/cpp/CppStructSerdes.cpp
 SOURCES += gen/cpp/CppProxyCommon.cpp
 SOURCES += gen/cpp/CppClientProxy.cpp
 SOURCES += gen/cpp/CppServerProxy.cpp
+SOURCES += gen/cpp/CppSessionProxy.cpp
 
 GENDIR = .gen
 CLEAN_EXTRA += $(GENDIR)

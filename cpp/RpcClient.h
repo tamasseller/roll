@@ -46,8 +46,8 @@ class ClientBase: StlEndpoint<Io>
 		cv.notify_all();
 	}
 
-
-protected:
+public:				// XXX
+//protected:
 	template<class Sym> class OnDemand
 	{
 		volatile bool lookupDone = false;
@@ -108,6 +108,11 @@ protected:
 		}
 	};
 
+    template<class Call, class... Args>
+    inline void callAction(Call& call, Args&&... args) {
+    	call.call(*this, std::forward<Args>(args)...);
+    }
+
     template<class Call, class Callback, class... Args>
     inline void callWithCallback(Call& call, Callback&& cb, Args&&... args)
     {
@@ -136,9 +141,64 @@ protected:
     	return f;
     }
 
-    template<class Call, class... Args>
-    inline void callAction(Call& call, Args&&... args) {
-    	call.call(*this, std::forward<Args>(args)...);
+    template<class Call, class Obj, class Callback, class... Args>
+    inline void createWithCallback(Call& call, Obj obj, Callback&& cb, Args&&... args)
+    {
+    	auto id = this->install([cb{std::move(cb)}, obj](Endpoint& rpc, rpc::MethodHandle h, rpc::Arg<0, &rpc::remove_cref_t<decltype(*obj)>::importRemote> import)
+		{
+    		obj->importRemote(import);
+    		cb();
+    		rpc.uninstall(h);
+    	});
+
+    	call.call(*this, std::forward<Args>(args)..., obj->exportLocal((Endpoint&)*this, obj), id);
+    }
+
+    template<class Call, class Obj, class Callback, class... Args>
+    inline void createWithCallbackRetval(Call& call, Obj obj, Callback&& cb, Args&&... args)
+    {
+    	auto id = this->install([cb{std::move(cb)}, obj](Endpoint& rpc, rpc::MethodHandle h, rpc::Arg<0, &Callback::operator()> arg, rpc::Arg<0, &rpc::remove_cref_t<decltype(*obj)>::importRemote> import)
+		{
+    		obj->importRemote(import);
+    		cb(rpc::move(arg));
+    		rpc.uninstall(h);
+    	});
+
+    	call.call(*this, std::forward<Args>(args)..., obj->exportLocal((Endpoint&)*this, obj), id);
+    }
+
+    template<class Call, class Obj, class... Args>
+    inline std::future<void> createWithPromise(Call& call, Obj obj, Args&&... args)
+    {
+    	std::promise<void> p;
+    	auto f = p.get_future();
+
+    	auto id = this->install([p{std::move(p)}, obj](Endpoint& rpc, rpc::MethodHandle h, rpc::Arg<0, &rpc::remove_cref_t<decltype(*obj)>::importRemote> import) mutable
+		{
+    		obj->importRemote(import);
+    		p.set_value();
+    		rpc.uninstall(h);
+    	});
+
+    	call.call(*this, std::forward<Args>(args)..., obj->exportLocal((Endpoint&)*this, obj), id);
+    	return f;
+    }
+
+    template<class Ret, class Call, class Obj, class... Args>
+    inline std::future<Ret> createWithPromiseRetval(Call& call, Obj obj, Args&&... args)
+    {
+    	std::promise<Ret> p;
+		auto f = p.get_future();
+
+    	auto id = this->install([p{std::move(p)}, obj](Endpoint& rpc, rpc::MethodHandle h, Ret arg, rpc::Arg<0, &rpc::remove_cref_t<decltype(*obj)>::importRemote> import) mutable
+		{
+    		obj->importRemote(import);
+    		p.set_value(rpc::move(arg));
+    		rpc.uninstall(h);
+    	});
+
+    	call.call(*this, std::forward<Args>(args)..., obj->exportLocal((Endpoint&)*this, obj), id);
+    	return f;
     }
 
 public:

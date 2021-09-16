@@ -191,7 +191,7 @@ public:
      * Wrapper around Endpoint::init.
      */
     template<class... Args>
-    StlEndpoint(Args&&... args): Io(std::forward<Args>(args)...)
+    explicit StlEndpoint(Args&&... args): Io(std::forward<Args>(args)...)
 	{
     	if(!this->StlEndpoint::Endpoint::init())
     	{

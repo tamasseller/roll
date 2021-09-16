@@ -33,6 +33,16 @@ namespace detail
     template<int n, class R, class A, class... As> struct nth_argument<n, R(*)(A, As...)> { using T = typename nth_argument<n - 1, R(*)(As...)>::T; };
     template<int n, class R, class C, class A, class... As> struct nth_argument<n, R(C::*)(A, As...)> { using T = typename nth_argument<n - 1, R(C::*)(As...)>::T; };
     template<int n, class R, class C, class A, class... As> struct nth_argument<n, R(C::*)(A, As...) const> { using T = typename nth_argument<n - 1, R(C::*)(As...)>::T; };
+
+    template<template<class> class Base> struct check_crtp_base
+    {
+    	template<bool value> struct Bool { static constexpr bool v = value; };
+    	template<class Subject> static constexpr Bool<true> isOk(Base<Subject>&) { return {}; }
+    	template<class Subject> static constexpr Bool<true> isOk(const Base<Subject>&) { return {}; }
+    	static constexpr Bool<false> isOk(...) { return {}; }
+    };
+
+    template<class C> static inline C& declval();
 }
 
 /**
@@ -92,6 +102,8 @@ template<auto p> using Ret = typename detail::return_type<decltype(p)>::T;
 
 template<auto p> static constexpr auto &nArgs = detail::argument_count<decltype(p)>::n;
 
+template<template<class> class Base, class Subject>
+static constexpr auto &hasCrtpBase = decltype(detail::check_crtp_base<Base>::isOk(detail::declval<Subject>()))::v;
 
 }
 

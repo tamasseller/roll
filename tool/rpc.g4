@@ -22,7 +22,7 @@ item: WS* (docs=DOCS)? WS* (cont=contract | func=function | alias=typeAlias | se
 rpc: items+=item (DECLSEP+ (items+=item | EOF))*;
 
 PRIMITIVE:      ([IiUu][1248]|'bool');
-IDENTIFIER:     [_a-zA-Z][_a-zA-Z0-9]*;
+IDENTIFIER:     [a-zA-Z][_a-zA-Z0-9]*;
 DOCS:			'/*' .*? '*/';
 LISTSEP: 		WS* ',' WS*;
 VALSEP:      	WS* ':' WS*;
