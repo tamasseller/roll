@@ -2,18 +2,20 @@
 
 #include "RpcStlArray.h"
 #include "RpcStlList.h"
-#include "RpcStlTuple.h"
-#include "RpcClient.h"
-#include "RpcStreamReader.h"
+
+#include "Contract.gen.h"
+
+#include "RpcFdStreamAdapter.h"
+
 #include "Tcp.h"
 
 #include <iostream>
-#include <string>
 #include <random>
-#include <future>
 
 static constexpr uint16_t defaultInitial = 2;
 static constexpr uint16_t defaultModulus = 19;
+
+using Client = InteropTestContract::ClientProxy<rpc::FdStreamAdapter>;
 
 template<class Target>
 static inline auto startServiceThread(std::shared_ptr<Target> uut)
@@ -30,22 +32,9 @@ static inline auto startServiceThread(std::shared_ptr<Target> uut)
     });
 }
 
-static inline auto generateUniqueKey()
+struct Service: InteropTestContract::ServerProxy<Service, rpc::FdStreamAdapter>
 {
-    std::random_device r;
-    std::default_random_engine e1(r());
-    std::uniform_int_distribution<char> uniform_dist('a', 'z');
-    std::stringstream ss;
-
-    for(int i = 0; i < 10; i++)
-        ss << uniform_dist(e1);
-
-    return ss.str();
-}
-
-struct Service: XXX<Service, rpc::FdStreamAdapter>
-{
-	using XXX::XXX;
+	using Service::ServerProxy::ServerProxy;
 	std::mutex m;
 	std::condition_variable cv;
 	volatile bool locked = true;
@@ -128,47 +117,6 @@ void runInteropListener(int sock)
     t.join();
 }
 
-static inline void runUnknownMethodLookupTest(std::shared_ptr<Client> uut)
-{
-    static constexpr auto nope = rpc::symbol<>("nope"_ctstr);
-
-	std::promise<bool> p;
-	auto ret = p.get_future();
-
-	const char* err = uut->lookup(nope, [p{std::move(p)}](auto&, bool done, auto) mutable { p.set_value(done); });
-	assert(err == nullptr);
-
-	bool failed = ret.get() == false;
-
-    assert(failed);
-}
-
-static inline void runEchoTest(std::shared_ptr<Client> uut)
-{
-	bool done = false;
-
-	auto key1 = generateUniqueKey();
-	std::vector<char> keyv;
-	std::copy(key1.begin(), key1.end(), std::back_inserter(keyv));
-    uut->echo(keyv, [&done, key1](const std::string& result)
-	{
-    	assert(result == key1);
-    	done = true;
-	});
-
-	auto key2 = generateUniqueKey();
-    std::stringstream ss;
-    for(char c: uut->echo<std::list<char>>(key2).get())
-    {
-    	ss.write(&c, 1);
-    }
-
-    auto result = ss.str();
-    assert(result == key2);
-
-    assert(done);
-}
-
 struct ClientStream: InteropTestStreamClientSession<ClientStream>
 {
 	uint16_t state = defaultInitial;
@@ -208,6 +156,60 @@ struct ClientStream: InteropTestStreamClientSession<ClientStream>
 		}
 	}
 };
+
+static inline void runUnknownMethodLookupTest(std::shared_ptr<Client> uut)
+{
+    static constexpr auto nope = rpc::symbol<>("nope"_ctstr);
+
+	std::promise<bool> p;
+	auto ret = p.get_future();
+
+	const char* err = uut->lookup(nope, [p{std::move(p)}](auto&, bool done, auto) mutable { p.set_value(done); });
+	assert(err == nullptr);
+
+	bool failed = ret.get() == false;
+
+    assert(failed);
+}
+
+static inline auto generateUniqueKey()
+{
+    std::random_device r;
+    std::default_random_engine e1(r());
+    std::uniform_int_distribution<char> uniform_dist('a', 'z');
+    std::stringstream ss;
+
+    for(int i = 0; i < 10; i++)
+        ss << uniform_dist(e1);
+
+    return ss.str();
+}
+
+static inline void runEchoTest(std::shared_ptr<Client> uut)
+{
+	bool done = false;
+
+	auto key1 = generateUniqueKey();
+	std::vector<char> keyv;
+	std::copy(key1.begin(), key1.end(), std::back_inserter(keyv));
+    uut->echo(keyv, [&done, key1](const std::string& result)
+	{
+    	assert(result == key1);
+    	done = true;
+	});
+
+	auto key2 = generateUniqueKey();
+    std::stringstream ss;
+    for(char c: uut->echo<std::list<char>>(key2).get())
+    {
+    	ss.write(&c, 1);
+    }
+
+    auto result = ss.str();
+    assert(result == key2);
+
+    assert(done);
+}
 
 static inline void runStreamGeneratorTest(std::shared_ptr<Client> uut)
 {

@@ -91,8 +91,8 @@ std::string generateExportLocalMethod(const SessionProxyFilter& nGen, const Cont
 		}
 	}
 
-	ss << indent(n + 1) << "exportsActive = true;";
-	ss << indent(n + 1) << "return exported;";
+	ss << indent(n + 1) << "exportsActive = true;" << std::endl;
+	ss << indent(n + 1) << "return exported;" << std::endl;
 
 	ss << indent(n) << "}";
 	return ss.str();
