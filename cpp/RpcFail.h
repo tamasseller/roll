@@ -24,7 +24,8 @@ public:
     inline RpcException(const std::string& str): str(std::string("RPC error: ") + str) {}
 };
 
-static inline void fail(const std::string& str) {
+[[noreturn]] static inline void fail(const std::string& str);
+static inline void fail(const std::string& str){
 	throw RpcException(str);
 }
 

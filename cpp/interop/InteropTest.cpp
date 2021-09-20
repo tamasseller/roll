@@ -19,6 +19,7 @@ struct ClientStream: InteropTestStreamClientSession<ClientStream>
 	const uint16_t mod = defaultModulus;
 
 	int n = 0;
+	bool closed = false;
 	std::mutex m;
 	std::condition_variable cv;
 
@@ -42,7 +43,7 @@ struct ClientStream: InteropTestStreamClientSession<ClientStream>
 		}
 	}
 
-	void wait(int n)
+	void waitAndClose(std::shared_ptr<Client> uut, int n)
 	{
 		std::unique_lock<std::mutex> l(m);
 
@@ -50,6 +51,20 @@ struct ClientStream: InteropTestStreamClientSession<ClientStream>
 		{
 			cv.wait(l);
 		}
+
+		this->close(uut);
+
+		while(!this->closed)
+		{
+			cv.wait(l);
+		}
+	}
+
+	void onClosed()
+	{
+		std::lock_guard _(m);
+		closed = true;
+		cv.notify_all();
 	}
 };
 
@@ -134,10 +149,10 @@ static inline void runStreamGeneratorTest(std::shared_ptr<Client> uut)
     assert(str == "asd");
     v->generate(uut, uint32_t(5));
 
-    s->wait(3);
-    t->wait(1);
-    u->wait(1);
-    v->wait(1);
+    s->waitAndClose(uut, 3);
+    t->waitAndClose(uut, 1);
+    u->waitAndClose(uut, 1);
+    v->waitAndClose(uut, 1);
 }
 
 void runInteropTests(int sock)

@@ -176,6 +176,8 @@ struct CommonTypeGenerator
 			return indent(n + 1) + i[1] + " " + i[0] + ";";
 		});
 
+		result.push_back(indent(n + 1) + "rpc::Call<> _close;");
+
 		std::stringstream ss;
 
 		if(writeBlock(ss, "struct " + name, result, n))

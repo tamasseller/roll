@@ -54,7 +54,7 @@ struct StructTypeInfoGenerator
 
 	static inline std::string handleItem(const std::string& contractName, const Contract::Session &s, const int n)
 	{
-		std::vector<std::string> fwd, bwd;
+		std::vector<std::string> fwd{"_close"}, bwd{"_close"};
 
 		for(const auto &i: s.items)
 		{
@@ -64,20 +64,8 @@ struct StructTypeInfoGenerator
 		const auto baseName = contractTypeBlockNameRef(contractName) + "::" + sessionNamespaceName(s.name);
 		std::stringstream ss;
 
-		if(fwd.size())
-		{
-			ss << serDesEntry(baseName + "::" + sessionCallExportTypeName(s.name), fwd, n) << std::endl;
-		}
-
-		if(bwd.size())
-		{
-			if(fwd.size())
-			{
-				ss << std::endl;
-			}
-
-			ss << serDesEntry(baseName + "::" + sessionCallbackExportTypeName(s.name), bwd, n);
-		}
+		ss << serDesEntry(baseName + "::" + sessionCallExportTypeName(s.name), fwd, n) << std::endl << std::endl;
+		ss << serDesEntry(baseName + "::" + sessionCallbackExportTypeName(s.name), bwd, n);
 
 		return ss.str();
 	}

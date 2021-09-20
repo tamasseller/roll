@@ -31,7 +31,7 @@ struct Service: InteropTestContract::ServerProxy<Service, rpc::FdStreamAdapter>
 		}
 
 		~StreamSession() {
-			srv->delCnt--;
+			srv->delCnt++;
 		}
 
 		void generate(uint32_t nData)
@@ -46,6 +46,11 @@ struct Service: InteropTestContract::ServerProxy<Service, rpc::FdStreamAdapter>
 			}
 
 			takeResult(srv, ret);
+		}
+
+		void onClosed()
+		{
+			close(srv);
 		}
 	};
 
@@ -88,7 +93,7 @@ void runInteropListener(int sock)
 	uut->wait();
 
     assert(uut->makeCnt > 0);
-    //assert(uut->delCnt == uut->makeCnt);
+    assert(uut->delCnt == uut->makeCnt);
 
     closeNow(sock);
     t.join();

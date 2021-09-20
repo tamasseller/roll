@@ -3,6 +3,8 @@
 #include "CppCommon.h"
 #include "CppProxyCommon.h"
 
+#include <algorithm>
+
 struct SessionProxyFilter
 {
 	const std::string cName, sName;
@@ -91,8 +93,7 @@ std::string generateExportLocalMethod(const SessionProxyFilter& nGen, const Cont
 		}
 	}
 
-	ss << indent(n + 1) << "exportsActive = true;" << std::endl;
-	ss << indent(n + 1) << "return exported;" << std::endl;
+	ss << indent(n + 1) << "return finalizeExports<&Child::onClosed>(_ep, _self);" << std::endl;
 
 	ss << indent(n) << "}";
 	return ss.str();
@@ -151,7 +152,8 @@ void writeSessionProxies(std::stringstream& ss, const Contract& c, const Session
 		{
 			auto nGen = f.make(c.name, s->name);
 			std::vector<std::string> result;
-			result.push_back(indent(1) + "template<class> friend class rpc::ClientBase;");
+			result.push_back(indent(1) + "template<class> friend class rpc::ClientBase;\n"
+					+ indent(1) + "friend " + contractRootBlockName(c.name) + ";");
 			result.push_back(generateExportLocalMethod(*nGen, *s, 1));
 			result.push_back("public:");
 
@@ -168,8 +170,9 @@ void writeSessionProxies(std::stringstream& ss, const Contract& c, const Session
 			std::stringstream hs;
 			hs << "template<class Child>" << std::endl;
 
-			hs << "class "
-					 << nGen->typeName() << ": SessionBase<" << nGen->importedName() << ", " << nGen->exportedName() << ">";
+			const auto exportCount = std::count_if(s->items.begin(), s->items.end(), [&nGen](const auto& i) {return nGen->asExport(i) != nullptr; });
+
+			hs << "class " << nGen->typeName() << ": public SessionBase<" << nGen->importedName() << ", " << nGen->exportedName() << ", " << exportCount << ">";
 			writeTopLevelBlock(ss, hs.str(), result, true);
 		}
 	}
