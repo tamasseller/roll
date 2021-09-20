@@ -46,8 +46,7 @@ class ClientBase: StlEndpoint<Io>
 		cv.notify_all();
 	}
 
-public:				// XXX
-//protected:
+protected:
 	template<class Sym> class OnDemand
 	{
 		volatile bool lookupDone = false;

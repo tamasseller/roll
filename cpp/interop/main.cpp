@@ -4,6 +4,7 @@
 
 #include "Tcp.h"
 #include "InteropTest.h"
+#include "InteropListener.h"
 
 static constexpr inline uint16_t port = 0xafaf;
 

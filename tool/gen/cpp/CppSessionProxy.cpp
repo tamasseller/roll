@@ -168,8 +168,7 @@ void writeSessionProxies(std::stringstream& ss, const Contract& c, const Session
 			std::stringstream hs;
 			hs << "template<class Child>" << std::endl;
 
-			hs << "struct " 			// XXX
-			// hs << "class "
+			hs << "class "
 					 << nGen->typeName() << ": SessionBase<" << nGen->importedName() << ", " << nGen->exportedName() << ">";
 			writeTopLevelBlock(ss, hs.str(), result, true);
 		}
