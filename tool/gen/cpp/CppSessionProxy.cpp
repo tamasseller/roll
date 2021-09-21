@@ -12,6 +12,7 @@ struct SessionProxyFilter
 	SessionProxyFilter(const std::string& cName, const std::string& sName): cName(cName), sName(sName) {}
 	virtual const Contract::Action* asImport(const Contract::Session::Item&) const = 0;
 	virtual const Contract::Action* asExport(const Contract::Session::Item&) const = 0;
+	virtual std::string friendName() const = 0;
 	virtual std::string typeName() const = 0;
 	virtual std::string importedName() const = 0;
 	virtual std::string exportedName() const = 0;
@@ -23,6 +24,7 @@ std::unique_ptr<SessionProxyFilter> ClientSessionProxyFilterFactory::make(const 
 	struct Ret: SessionProxyFilter
 	{
 		using SessionProxyFilter::SessionProxyFilter;
+		virtual std::string friendName() const override { return "rpc::ClientBase"; };
 		virtual std::string typeName() const override { return clientSessionName(cName, sName); }
 		virtual std::string importedName() const override { return contractTypeBlockNameRef(cName) + "::" + sessionNamespaceName(sName) + "::" + sessionCallExportTypeName(sName); }
 		virtual std::string exportedName() const override { return contractTypeBlockNameRef(cName) + "::" + sessionNamespaceName(sName) + "::" + sessionCallbackExportTypeName(sName); }
@@ -38,6 +40,7 @@ std::unique_ptr<SessionProxyFilter> ServerSessionProxyFilterFactory::make(const 
 	struct Ret: SessionProxyFilter
 	{
 		using SessionProxyFilter::SessionProxyFilter;
+		virtual std::string friendName() const override { return "rpc::ServiceBase"; };
 		virtual std::string typeName() const override { return serverSessionName(cName, sName); }
 		virtual std::string importedName() const override { return contractTypeBlockNameRef(cName) + "::" + sessionNamespaceName(sName) + "::" + sessionCallbackExportTypeName(sName); }
 		virtual std::string exportedName() const override { return contractTypeBlockNameRef(cName) + "::" + sessionNamespaceName(sName) + "::" + sessionCallExportTypeName(sName); }
@@ -152,8 +155,8 @@ void writeSessionProxies(std::stringstream& ss, const Contract& c, const Session
 		{
 			auto nGen = f.make(c.name, s->name);
 			std::vector<std::string> result;
-			result.push_back(indent(1) + "template<class> friend class rpc::ClientBase;\n"
-					+ indent(1) + "friend " + contractRootBlockName(c.name) + ";");
+
+			result.push_back(indent(1) + "template<class> friend class " + nGen->friendName() + ";\n");
 			result.push_back(generateExportLocalMethod(*nGen, *s, 1));
 			result.push_back("public:");
 

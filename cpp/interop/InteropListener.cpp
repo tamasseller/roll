@@ -55,11 +55,31 @@ struct Service: InteropTestContract::ServerProxy<Service, rpc::FdStreamAdapter>
 	};
 
 	std::pair<std::string, std::shared_ptr<StreamSession>> open(uint8_t initial, uint8_t modulus) {
-		return {"asd", std::make_shared<Service::StreamSession>(this, initial, modulus)};
+		return {"asd", std::make_shared<StreamSession>(this, initial, modulus)};
 	}
 
 	std::shared_ptr<StreamSession> openDefault() {
-		return std::make_shared<Service::StreamSession>(this, defaultInitial, defaultModulus);
+		return std::make_shared<StreamSession>(this, defaultInitial, defaultModulus);
+	}
+
+	struct InstaCloseSession: InteropTestInstantCloseServerSession<InstaCloseSession>
+	{
+		Service* srv;
+
+		InstaCloseSession(Service* srv): srv(srv) {
+			srv->makeCnt++;
+		}
+
+		~InstaCloseSession() {
+			srv->delCnt++;
+		}
+
+		void onClosed() {}
+	};
+
+	std::shared_ptr<InstaCloseSession> closeMe()
+	{
+		return std::make_shared<InstaCloseSession>(this);
 	}
 
 	void unlock(bool doIt)

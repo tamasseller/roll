@@ -22,6 +22,12 @@ std::string CodeGenCpp::generate(const std::vector<Contract>& cs, bool doClient,
 	ss << "#include \"RpcStruct.h\"" << std::endl;
 	ss << "#include \"RpcSymbol.h\"" << std::endl;
 	ss << "#include \"RpcSession.h\"" << std::endl;
+
+	if(doClient)
+	{
+		ss << "#include \"RpcService.h\"" << std::endl;
+	}
+
 	ss << "#include \"RpcTypeInfo.h\"" << std::endl << std::endl;
 
 	for(const auto& c: cs)

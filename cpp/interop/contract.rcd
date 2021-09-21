@@ -41,3 +41,8 @@ stream
 	
 	openDefault();
 >;
+
+instantClose
+<
+	closeMe();
+>;

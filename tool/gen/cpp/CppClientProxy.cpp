@@ -103,7 +103,7 @@ struct MemberFunctionGenerator
 		for(auto i = 0u; i < args.size(); i++)
 		{
 			const auto msg = "Argument #" + std::to_string(i + 1) + " of " + name
-					+ " must have type compatible with '" + args[i][2] + "'";
+					+ " (" + args[i][1] + ") must have type compatible with '" + args[i][2] + "'";
 
 			ss << argCheck("A" + std::to_string(i), args[i][0], msg , n);
 		}
@@ -249,7 +249,7 @@ struct MemberFunctionGenerator
 		{
 			const auto cppTypeName = std::visit([&cName](const auto &i){return cppTypeRef(i, cName);}, f.args[i].type);
 			const auto refTypeName = std::visit([](const auto &i){return refTypeRef(i);}, f.args[i].type);
-			const auto msg = "Argument #" + std::to_string(i + 2) + " to " + defName + " must have type compatible with '" + refTypeName + "'";
+			const auto msg = "Argument #" + std::to_string(i + 2) + " to " + defName + " (" + f.args[i].name + ") must have type compatible with '" + refTypeName + "'";
 			ss << argCheck("A" + std::to_string(i), cppTypeName, msg , n + 1);
 		}
 
