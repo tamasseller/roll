@@ -18,7 +18,7 @@ CLI_APP(codegen, "Generate source code from contract descriptor")
 	if(this->processCommandLine())
 	{
 		const auto ast = parse(*opts.input);
-		const auto src = opts.invokeGenerator(ast);
+		const auto src = opts.invokeGenerator(ast, opts.OutputOptions::name);
 		*opts.output << src;
 		return 0;
 	}

@@ -16,6 +16,7 @@ struct Service: InteropTestContract::ServerProxy<Service, rpc::FdStreamAdapter>
 	std::condition_variable cv;
 	volatile bool locked = true;
 	volatile int makeCnt = 0, delCnt = 0;
+	volatile int closeCnt = 0, openCnt = 0;
 
 	struct StreamSession: InteropTestStreamServerSession<StreamSession>
 	{
@@ -50,7 +51,12 @@ struct Service: InteropTestContract::ServerProxy<Service, rpc::FdStreamAdapter>
 
 		void onClosed()
 		{
+			srv->closeCnt++;
 			close(srv);
+		}
+
+		void onOpened() {
+			srv->openCnt++;
 		}
 	};
 
@@ -65,8 +71,9 @@ struct Service: InteropTestContract::ServerProxy<Service, rpc::FdStreamAdapter>
 	struct InstaCloseSession: InteropTestInstantCloseServerSession<InstaCloseSession>
 	{
 		Service* srv;
+		const bool instaclose;
 
-		InstaCloseSession(Service* srv): srv(srv) {
+		InstaCloseSession(Service* srv, bool instaclose): srv(srv), instaclose(instaclose) {
 			srv->makeCnt++;
 		}
 
@@ -74,12 +81,29 @@ struct Service: InteropTestContract::ServerProxy<Service, rpc::FdStreamAdapter>
 			srv->delCnt++;
 		}
 
-		void onClosed() {}
+		void onClosed()
+		{
+			srv->closeCnt++;
+
+			if(!instaclose)
+			{
+				this->close(srv);
+			}
+		}
+
+		void onOpened()
+		{
+			srv->openCnt++;
+
+			if(instaclose)
+			{
+				this->close(srv);
+			}
+		}
 	};
 
-	std::shared_ptr<InstaCloseSession> closeMe()
-	{
-		return std::make_shared<InstaCloseSession>(this);
+	std::pair<std::string, std::shared_ptr<InstaCloseSession>> closeMe(bool instaClose) {
+		return {instaClose ? "die": "ok", std::make_shared<InstaCloseSession>(this, instaClose)};
 	}
 
 	void unlock(bool doIt)
@@ -112,8 +136,10 @@ void runInteropListener(int sock)
 
 	uut->wait();
 
-    assert(uut->makeCnt > 0);
+    assert(uut->closeCnt == uut->openCnt);
+    assert(uut->makeCnt == uut->closeCnt);
     assert(uut->delCnt == uut->makeCnt);
+    assert(uut->makeCnt > 0);
 
     closeNow(sock);
     t.join();

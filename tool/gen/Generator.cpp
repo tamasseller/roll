@@ -30,3 +30,14 @@ void GeneratorOptions::select(const std::string &str)
 		throw std::runtime_error("Unknown language requested");
 	}
 }
+
+std::string GeneratorOptions::invokeGenerator(const std::vector<Contract>& ast, std::optional<std::string> name)
+{
+	if(ast.size())
+	{
+		const auto n = this->name.value_or(name.value_or(ast.front().name));
+		return language->generate(ast, n, doClient, doService);
+	}
+
+	return {};
+}

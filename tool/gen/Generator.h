@@ -8,13 +8,14 @@
 struct CodeGen
 {
 	inline virtual ~CodeGen() = default;
-	virtual std::string generate(const std::vector<Contract>& ast, bool generateClientProxy, bool generateServiceProxy) const = 0;
+	virtual std::string generate(const std::vector<Contract>& ast, const std::string& name, bool generateClientProxy, bool generateServiceProxy) const = 0;
 };
 
 struct GeneratorOptions
 {
 	const CodeGen* language;
-	bool doClient = true, doService = true;
+	bool doClient = false, doService = false;
+	std::optional<std::string> name;
 
 	void select(const std::string &str);
 
@@ -26,23 +27,26 @@ public:
 	{
 		h->addOptions({"-l", "--lang", "--source-language"}, "Set source language to generate code for [default: c++]", [this](const std::string &str)
 		{
-			select(str);
+			this->select(str);
 		});
 
-		h->addOptions({"-nc", "--no-client"}, "Do not generate RPC adapters for client side [default: do it]", [this]()
+		h->addOptions({"-n", "--name", "--module-name"}, "Set the module name to generate code for [default: based on output filename or first contract name]", [this](const std::string &str)
 		{
-			this->doClient = false;
+			this->name = str;
 		});
 
-		h->addOptions({"-ns", "--no-service"}, "Do not generate RPC adapters for server side [default: do it]", [this]()
+		h->addOptions({"-c", "--client"}, "Generate RPC proxy for client side [default: don't]", [this]()
 		{
-			this->doService = false;
+			this->doClient = true;
+		});
+
+		h->addOptions({"-s", "--service"}, "Generate RPC proxy for server side [default: don't]", [this]()
+		{
+			this->doService = true;
 		});
 	}
 
-	inline std::string invokeGenerator(const std::vector<Contract>& ast) {
-		return language->generate(ast, doClient, doService);
-	}
+	std::string invokeGenerator(const std::vector<Contract>& ast, std::optional<std::string> name);
 };
 
 #endif /* RPC_TOOL_GEN_GENERATOR_H_ */

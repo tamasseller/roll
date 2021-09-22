@@ -66,6 +66,47 @@ struct ClientStream: InteropTestStreamClientSession<ClientStream>
 		closed = true;
 		cv.notify_all();
 	}
+
+	void onOpened() {}
+};
+
+class CloseMeSession: public InteropTestInstantCloseClientSession<CloseMeSession>
+{
+	bool closed = false;
+	std::mutex m;
+	std::condition_variable cv;
+
+	void wait()
+	{
+		std::unique_lock<std::mutex> l(m);
+
+		while(!closed)
+		{
+			cv.wait(l);
+		}
+	}
+
+public:
+	void onClosed()
+	{
+		std::lock_guard _(m);
+		closed = true;
+		cv.notify_all();
+	}
+
+	void onOpened() {}
+
+	void closeAndWait(std::shared_ptr<Client> uut)
+	{
+		this->close(uut);
+		this->wait();
+	}
+
+	void waitAndClose(std::shared_ptr<Client> uut)
+	{
+		this->wait();
+		this->close(uut);
+	}
 };
 
 static inline void runUnknownMethodLookupTest(std::shared_ptr<Client> uut)
@@ -155,6 +196,23 @@ static inline void runStreamGeneratorTest(std::shared_ptr<Client> uut)
     v->waitAndClose(uut, 1);
 }
 
+
+static inline void runRejectionTests(std::shared_ptr<Client> uut)
+{
+	auto a = std::make_shared<CloseMeSession>();
+
+	uut->closeMe(a, true, [&a](const std::string& str)
+	{
+		assert(str == "die");
+	});
+
+	a->waitAndClose(uut);
+
+	auto b = std::make_shared<CloseMeSession>();
+	assert(uut->closeMe<std::string>(b, false).get() == "ok");
+	b->closeAndWait(uut);
+}
+
 void runInteropTests(int sock)
 {
 	auto uut = std::make_shared<Client>(sock, sock);
@@ -164,6 +222,7 @@ void runInteropTests(int sock)
     runUnknownMethodLookupTest(uut);
     runEchoTest(uut);
     runStreamGeneratorTest(uut);
+    runRejectionTests(uut);
 
     uut->unlock(true);
 

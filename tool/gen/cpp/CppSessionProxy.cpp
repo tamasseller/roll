@@ -56,7 +56,7 @@ std::string generateExportLocalMethod(const SessionProxyFilter& nGen, const Cont
 	std::stringstream ss;
 
 	ss << indent(n) << "template<class Ep, class Self>" << std::endl;
-	ss << indent(n) << "inline auto exportLocal(Ep& _ep, Self _self)" << std::endl;
+	ss << indent(n) << "inline auto exportLocal(Ep& ep, Self self)" << std::endl;
 	ss << indent(n) << "{" << std::endl;
 
 	std::string sep;
@@ -89,15 +89,26 @@ std::string generateExportLocalMethod(const SessionProxyFilter& nGen, const Cont
 				ss << ", rpc::Arg<" + std::to_string(i) + ", &Child::" + defName + ">";
 			}
 
-			ss << ">(_ep, _self);" << std::endl;
+			ss << ">(ep, self);" << std::endl;
 
 			ss << sep;
 			sep = "\n";
 		}
 	}
 
-	ss << indent(n + 1) << "return finalizeExports<&Child::onClosed>(_ep, _self);" << std::endl;
+	ss << indent(n + 1) << "return finalizeExports<&Child::onClosed>(ep, self);" << std::endl;
 
+	ss << indent(n) << "}";
+	return ss.str();
+}
+
+std::string generateImportRemoteMethod(const SessionProxyFilter& nGen, const std::string& importName, const int n)
+{
+	std::stringstream ss;
+	ss << indent(n) << "auto importRemote(const " << importName << "& i)" << std::endl;
+	ss << indent(n) << "{" << std::endl;
+	ss << indent(n + 1) << "this->SessionBase::importRemote(i);" << std::endl;
+	ss << indent(n + 1) << "static_cast<Child*>(this)->onOpened();" << std::endl;
 	ss << indent(n) << "}";
 	return ss.str();
 }
@@ -116,7 +127,7 @@ std::string generateImportProxyMethod(const SessionProxyFilter& nGen, const Cont
 	ss << ">" << std::endl;
 	const auto defName = definitionMemberFunctionName(a.name);
 
-	ss << indent(n) << "inline auto " << defName << "(Ep& _ep";
+	ss << indent(n) << "inline auto " << defName << "(Ep& ep";
 
 	for(auto i = 0u; i < a.args.size(); i++)
 	{
@@ -134,7 +145,7 @@ std::string generateImportProxyMethod(const SessionProxyFilter& nGen, const Cont
 		ss << argCheck("A" + std::to_string(i), cppTypeName, msg , n + 1);
 	}
 
-	ss << indent(n + 1) << "return this->callImported<&" << nGen.importedName() << "::" << defName << ">(_ep";
+	ss << indent(n + 1) << "return this->callImported<&" << nGen.importedName() << "::" << defName << ">(ep";
 
 	for(auto i = 0u; i < a.args.size(); i++)
 	{
@@ -156,8 +167,9 @@ void writeSessionProxies(std::stringstream& ss, const Contract& c, const Session
 			auto nGen = f.make(c.name, s->name);
 			std::vector<std::string> result;
 
-			result.push_back(indent(1) + "template<class> friend class " + nGen->friendName() + ";\n");
+			result.push_back(indent(1) + "template<class> friend class " + nGen->friendName() + ";");
 			result.push_back(generateExportLocalMethod(*nGen, *s, 1));
+			result.push_back(generateImportRemoteMethod(*nGen, nGen->importedName(), 1));
 			result.push_back("public:");
 
 			for(const Contract::Session::Item& item: s->items)

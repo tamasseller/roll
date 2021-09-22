@@ -257,15 +257,16 @@ public:
 		const auto idHash = sym.hash();
 
 		bool ok;
-		auto result = symbolRegistry.find(idHash, ok);
+		auto rPtr = symbolRegistry.find(idHash, ok);
 
 		if(!ok)
 		{
 			return Errors::noSuchSymbol;
 		}
 
+		auto result = *rPtr;
 		auto &core = *((typename Endpoint::Core*)this);
-		if(!symbolRegistry.remove(idHash) || !core.removeCall(*result))
+		if(!symbolRegistry.remove(idHash) || !core.removeCall(result))
 		{
 			return Errors::internalError; // GCOV_EXCL_LINE
 		}

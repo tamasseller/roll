@@ -27,7 +27,4 @@ RPCTOOL = ../../tool/rpc-tool
 $(abspath InteropTest.h): $(abspath Contract.gen.h)
 
 $(abspath Contract.gen.h): contract.rcd
-	$(RPCTOOL) codegen -l c++ -i $< -o $@
-
-$(RPCTOOL): 
-	make -C $(dirname $@)
+	$(RPCTOOL) codegen -s -c -l c++ -i $< -o $@

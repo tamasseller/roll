@@ -45,11 +45,11 @@ class SessionBase
 		return false;
 	}
 
-	inline void finalize(void* endpunkt, const void* mich)
+	inline void finalize(void* ep, const void* me)
 	{
 		for(auto &u: unexporters)
 		{
-			u(endpunkt, mich);
+			u(ep, me);
 			u = nullptr;
 		}
 	}

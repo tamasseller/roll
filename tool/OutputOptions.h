@@ -3,6 +3,9 @@
 
 #include <iostream>
 #include <fstream>
+#include <optional>
+
+#include <libgen.h>
 
 class OutputOptions
 {
@@ -10,6 +13,7 @@ class OutputOptions
 
 public:
 	std::ostream *output = &std::cout;
+	std::optional<std::string> name;
 
 	template<class Host>
 	void add(Host* h)
@@ -23,6 +27,7 @@ public:
 			else
 			{
 				this->output = &outputFile;
+				this->name = basename(const_cast<char*>(str.c_str()));
 			}
 		});
 	}

@@ -9,9 +9,28 @@
 
 const CodeGenCpp CodeGenCpp::instance;
 
-std::string CodeGenCpp::generate(const std::vector<Contract>& cs, bool doClient, bool doService) const
+static inline std::string allcapsEscape(const std::string &str)
+{
+	std::string ret(str.size(), '\0');
+
+	for(auto i = 0u; i < str.size(); i++)
+	{
+		ret[i] = std::isalnum(str[i]) ? std::toupper(str[i]) : '_';
+	}
+
+	return ret;
+}
+
+
+std::string CodeGenCpp::generate(const std::vector<Contract>& cs, const std::string& name, bool doClient, bool doService) const
 {
 	std::stringstream ss;
+
+	const auto guardMacroName = "_" + allcapsEscape(name) + "_";
+
+	ss << "#ifndef " << guardMacroName << std::endl;
+	ss << "#define " << guardMacroName << std::endl << std::endl;
+
 	ss << "#include \"RpcCall.h\"" << std::endl;
 
 	if(doClient)
@@ -57,5 +76,6 @@ std::string CodeGenCpp::generate(const std::vector<Contract>& cs, bool doClient,
 		}
 	}
 
+	ss << std::endl << "#endif /* " << guardMacroName << " */" << std::endl;
 	return ss.str();
 }

@@ -44,5 +44,5 @@ stream
 
 instantClose
 <
-	closeMe();
+	closeMe(instant: bool): [i1];
 >;
