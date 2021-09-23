@@ -7,3 +7,6 @@
 [submodule "cli-base"]
 	path = cli-base
 	url = http://github.com/tamasseller/cli-base
+[submodule "roll-test"]
+	path = roll-test
+	url = https://github.com/tamasseller/roll-test
