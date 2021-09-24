@@ -100,7 +100,7 @@ protected:
 					}
 					else
 					{
-						fail(std::string("failed to look up symbol '") + (const char*)sym + "'");
+						fail("failed to look up symbol '", (const char*)sym, "'");
 					}
 				});
 			}

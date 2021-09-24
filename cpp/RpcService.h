@@ -3,15 +3,14 @@
 
 #include "RpcUtility.h"
 #include "RpcEndpoint.h"
-#include "RpcStlAdapters.h"
 
 namespace rpc {
 
-template<class Io>
-class ServiceBase: StlEndpoint<Io>
+template<class EpArg>
+class ServiceBase: EpArg
 {
 public:
-    using Endpoint = typename ServiceBase::StlEndpoint::Endpoint;
+    using Endpoint = typename EpArg::Endpoint;
 
 protected:
 	template<auto &sym, class Child, auto member, class... Args>
@@ -19,12 +18,12 @@ protected:
 	{
 		auto err = this->provide(sym, [self{static_cast<Child*>(this)}](Endpoint&, rpc::MethodHandle, Args... args)
 		{
-			(self->*member)(std::forward<Args>(args)...);
+			(self->*member)(rpc::forward<Args>(args)...);
 		});
 
 		if(err)
 		{
-			rpc::fail(std::string("Registering public method '") + (const char*)sym + "' resulted in error " + err);
+			rpc::fail("Registering public method '", (const char*)sym, "' resulted in error ");
 		}
 	}
 
@@ -33,15 +32,15 @@ protected:
 	{
 		auto err = this->provide(sym, [self{static_cast<Child*>(this)}](Endpoint& ep, rpc::MethodHandle, Args... args, rpc::Call<Ret> cb)
 		{
-			if(auto err = ep.call(cb, (self->*member)(std::forward<Args>(args)...)))
+			if(auto err = ep.call(cb, (self->*member)(rpc::forward<Args>(args)...)))
 			{
-				rpc::fail(std::string("Calling callback of public method '") + (const char*)sym + "' resulted in error " + err);
+				rpc::fail("Calling callback of public method '", (const char*)sym, "' resulted in error ", err);
 			}
 		});
 
 		if(err)
 		{
-			rpc::fail(std::string("Registering public method '") + (const char*)sym + "' resulted in error " + err);
+			rpc::fail("Registering public method '", (const char*)sym, "' resulted in error ", err);
 		}
 	}
 
@@ -50,11 +49,11 @@ protected:
 	{
 		auto err = this->provide(sym, [self{static_cast<Child*>(this)}](Endpoint& ep, rpc::MethodHandle, Args... args, Exports exports, Accept accept)
 		{
-			auto obj = (self->*member)(std::forward<Args>(args)...);
+			auto obj = (self->*member)(rpc::forward<Args>(args)...);
 
 			if(auto err = ep.call(accept, obj->exportLocal(ep, obj)))
 			{
-				rpc::fail(std::string("Calling accept callback for session constructor '") + (const char*)sym + "' resulted in error " + err);
+				rpc::fail("Calling accept callback for session constructor '", (const char*)sym, "' resulted in error ", err);
 			}
 
 			obj->importRemote(exports);
@@ -62,7 +61,7 @@ protected:
 
 		if(err)
 		{
-			rpc::fail(std::string("Registering public method '") + (const char*)sym + "' resulted in error " + err);
+			rpc::fail("Registering public method '", (const char*)sym, "' resulted in error ", err);
 		}
 	}
 
@@ -71,13 +70,13 @@ protected:
 	{
 		auto err = this->provide(sym, [self{static_cast<Child*>(this)}](Endpoint& ep, rpc::MethodHandle, Args... args, Exports exports, Accept accept)
 		{
-			auto pair = (self->*member)(std::forward<Args>(args)...);
-			auto ret = std::move(pair.first);
-			auto obj = std::move(pair.second);
+			auto pair = (self->*member)(rpc::forward<Args>(args)...);
+			auto ret = rpc::move(pair.first);
+			auto obj = rpc::move(pair.second);
 
-			if(auto err = ep.call(accept, std::move(ret), obj->exportLocal(ep, obj)))
+			if(auto err = ep.call(accept, rpc::move(ret), obj->exportLocal(ep, obj)))
 			{
-				rpc::fail(std::string("Calling accept callback for session constructor '") + (const char*)sym + "' resulted in error " + err);
+				rpc::fail("Calling accept callback for session constructor '", (const char*)sym, "' resulted in error ", err);
 			}
 
 			obj->importRemote(exports);
@@ -85,7 +84,7 @@ protected:
 
 		if(err)
 		{
-			rpc::fail(std::string("Registering public method '") + (const char*)sym + "' resulted in error " + err);
+			rpc::fail("Registering public method '", (const char*)sym, "' resulted in error ", err);
 		}
 	}
 
@@ -98,7 +97,7 @@ public:
     using Endpoint::discard;
     using Endpoint::process;
 
-    using ServiceBase::StlEndpoint::StlEndpoint;
+    using EpArg::EpArg;
 };
 
 }

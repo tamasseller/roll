@@ -7,7 +7,7 @@
  * RPC specific exception object.
  */
 
-#include <string>
+#include <sstream>
 #include <exception>
 
 namespace rpc {
@@ -24,9 +24,18 @@ public:
     inline RpcException(const std::string& str): str(std::string("RPC error: ") + str) {}
 };
 
-[[noreturn]] static inline void fail(const std::string& str);
-static inline void fail(const std::string& str){
-	throw RpcException(str);
+template<class... C>
+static inline void fail(C... args)
+{
+	const std::string strArgs[] = {args...};
+
+	std::stringstream ss;
+	for(const auto& s: strArgs)
+	{
+		ss << s;
+	}
+
+	throw RpcException(ss.str());
 }
 
 }
