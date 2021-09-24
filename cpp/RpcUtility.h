@@ -41,8 +41,6 @@ namespace detail
     	template<class Subject> static constexpr Bool<true> isOk(const Base<Subject>&) { return {}; }
     	static constexpr Bool<false> isOk(...) { return {}; }
     };
-
-    template<class C> static inline C& declval();
 }
 
 /**
@@ -102,8 +100,10 @@ template<auto p> using Ret = typename detail::return_type<decltype(p)>::T;
 
 template<auto p> static constexpr auto &nArgs = detail::argument_count<decltype(p)>::n;
 
+template<class C> static inline C& declval();
+
 template<template<class> class Base, class Subject>
-static constexpr auto &hasCrtpBase = decltype(detail::check_crtp_base<Base>::isOk(detail::declval<Subject>()))::v;
+static constexpr auto &hasCrtpBase = decltype(detail::check_crtp_base<Base>::isOk(declval<Subject>()))::v;
 
 }
 
