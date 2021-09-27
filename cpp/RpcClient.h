@@ -12,7 +12,7 @@
 namespace rpc {
 
 template<class Io>
-class ClientBase: StlEndpoint<Io>
+class ClientBase: public StlEndpoint<Io>
 {
     friend typename ClientBase::Endpoint;
 

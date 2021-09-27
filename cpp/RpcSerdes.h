@@ -46,6 +46,10 @@ namespace detail
 		using Result = typename StripLast<Rest...>::Result::template Prepend<First>;
 	};
 
+	/**
+	 * Helper that ensures correct order of evaluation of arguments via the "brace-enclosed
+	 * comma-separated list of initalizers" sequencing rule.
+	 */
 	struct CallHelper
 	{
 		const char* result = Errors::wrongMethodRequest;
@@ -54,10 +58,15 @@ namespace detail
 		inline constexpr CallHelper(C&& c, Types&&... args) 
 		{
 			bool ok = (args, ...);
+
 			if(ok)
+			{
 				result = StripLast<Types...>::Result::template call<C>(rpc::forward<C>(c), rpc::forward<Types>(args)...);
+			}
 			else
+			{
 				result = Errors::messageFormatError;
+			}
 		}
 	};
 	
@@ -113,6 +122,13 @@ template<class... Args, class... ExtraArgs, class C, class S>
 static inline const char* deserialize(S& s, C&& c, ExtraArgs&&... extraArgs)
 {
 	bool ok = true;
+
+	//
+	//  In list-initialization, every value computation and side effect of a given
+	//  initializer clause is sequenced before every value computation and side effect
+	//  associated with any initializer clause that follows it in the brace-enclosed
+	//  comma-separated list of initalizers.
+	//
 	return detail::CallHelper{rpc::forward<C>(c), rpc::forward<ExtraArgs>(extraArgs)..., detail::readNext<Args>(s, ok)..., ok}.result;
 }
 

@@ -3,6 +3,7 @@
 
 #include "RpcCall.h"
 #include "RpcVarInt.h"
+#include "RpcCollection.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -139,24 +140,6 @@ template<class... Args> struct TypeInfo<Call<Args...>>
 	template<class S> static inline bool skip(S& s) { return ::rpc::VarUint4::skip(s); }
 	static constexpr inline size_t size(const Call<Args...> &v) { return ::rpc::VarUint4::size(v.id); }
 	static constexpr inline bool isConstSize() { return false; }
-};
-
-/**
- * Placeholder for contract definitions.
- *
- * NOTE: It can not be used to access (read/write) data.
- */
-template<class T> struct CollectionPlaceholder {
-	template<class S> static constexpr inline decltype(auto) writeName(S&& s) {
-		return TypeInfo<T>::writeName(s << "[") << "]";
-	}
-};
-
-template<class T> struct TypeInfo<CollectionPlaceholder<T>>
-{
-	template<class S> static constexpr inline decltype(auto) writeName(S&& s) {
-		return CollectionPlaceholder<T>::writeName(rpc::move(s));
-	}
 };
 
 /**

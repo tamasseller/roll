@@ -3,6 +3,7 @@
 
 #include "RpcFail.h"
 #include "RpcEndpoint.h"
+#include "RpcStlArray.h"
 
 #include <memory>
 #include <sstream>
@@ -14,6 +15,10 @@
 namespace rpc {
 
 template<class... CbArgs> class Call;
+
+template<> struct CollectionSelector<int8_t> {
+	using Type = std::string;
+};
 
 namespace detail
 {

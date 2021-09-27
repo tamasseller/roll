@@ -7,7 +7,7 @@
 namespace rpc {
 
 template<class EpArg>
-class ServiceBase: EpArg
+class ServiceBase: public EpArg
 {
 public:
     using Endpoint = typename EpArg::Endpoint;
