@@ -18,7 +18,7 @@ template<class T> struct TypeInfo<CollectionPlaceholder<T>>
 	}
 };
 
-template<class Element> struct CollectionSelector {
+template<class Element, class Dummy = void> struct CollectionSelector {
 	using Type = CollectionPlaceholder<Element>;
 };
 

@@ -16,8 +16,12 @@ namespace rpc {
 
 template<class... CbArgs> class Call;
 
-template<> struct CollectionSelector<int8_t> {
+template<> struct CollectionSelector<int8_t, void> {
 	using Type = std::string;
+};
+
+template<class C> struct CollectionSelector<C, void> {
+	using Type = std::vector<C>;
 };
 
 namespace detail
