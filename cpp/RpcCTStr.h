@@ -48,7 +48,7 @@ public:
 	 *
 	 * https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
 	 */
-    constexpr size_t hash() const
+    constexpr auto hash() const
     {
     	const uint64_t offset = uint64_t(14695981039346656037u);
 		const uint64_t prime = uint64_t(1099511628211u);
