@@ -1,7 +1,12 @@
 #ifndef RPC_CPP_RPCSESSION_H_
 #define RPC_CPP_RPCSESSION_H_
 
-#include "RpcClient.h"
+#include "RpcFail.h"
+#include "RpcErrors.h"
+
+namespace rpc {
+
+template<class> class ClientBase;
 
 template<class Imported, class Exported, size_t nExported>
 class SessionBase
@@ -128,5 +133,7 @@ public:
 		}
 	}
 };
+
+}
 
 #endif /* RPC_CPP_RPCSESSION_H_ */

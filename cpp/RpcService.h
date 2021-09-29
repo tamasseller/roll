@@ -23,7 +23,7 @@ protected:
 
 		if(err)
 		{
-			rpc::fail("Registering public method '", (const char*)sym, "' resulted in error ");
+			rpc::fail("Registering '", (const char*)sym, "': ", err);
 		}
 	}
 
@@ -34,13 +34,13 @@ protected:
 		{
 			if(auto err = ep.call(cb, (self->*member)(rpc::forward<Args>(args)...)))
 			{
-				rpc::fail("Calling callback of public method '", (const char*)sym, "' resulted in error ", err);
+				rpc::fail("Calling callback of '", (const char*)sym, "': ", err);
 			}
 		});
 
 		if(err)
 		{
-			rpc::fail("Registering public method '", (const char*)sym, "' resulted in error ", err);
+			rpc::fail("Registering '", (const char*)sym, "': ", err);
 		}
 	}
 
@@ -53,7 +53,7 @@ protected:
 
 			if(auto err = ep.call(accept, obj->exportLocal(ep, obj)))
 			{
-				rpc::fail("Calling accept callback for session constructor '", (const char*)sym, "' resulted in error ", err);
+				rpc::fail("Calling accept for '", (const char*)sym, "': ", err);
 			}
 
 			obj->importRemote(exports);
@@ -61,7 +61,7 @@ protected:
 
 		if(err)
 		{
-			rpc::fail("Registering public method '", (const char*)sym, "' resulted in error ", err);
+			rpc::fail("Registering '", (const char*)sym, "': ", err);
 		}
 	}
 
@@ -76,7 +76,7 @@ protected:
 
 			if(auto err = ep.call(accept, rpc::move(ret), obj->exportLocal(ep, obj)))
 			{
-				rpc::fail("Calling accept callback for session constructor '", (const char*)sym, "' resulted in error ", err);
+				rpc::fail("Calling accept for '", (const char*)sym, "': ", err);
 			}
 
 			obj->importRemote(exports);
@@ -84,7 +84,7 @@ protected:
 
 		if(err)
 		{
-			rpc::fail("Registering public method '", (const char*)sym, "' resulted in error ", err);
+			rpc::fail("Registering '", (const char*)sym, "': ", err);
 		}
 	}
 

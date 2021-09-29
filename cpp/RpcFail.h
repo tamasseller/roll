@@ -1,7 +1,6 @@
 #ifndef RPC_CPP_INTEROP_RPCFAIL_H_
 #define RPC_CPP_INTEROP_RPCFAIL_H_
 
-
 #ifdef __EXCEPTIONS
 /**
  * RPC specific exception object.
@@ -40,18 +39,40 @@ static inline void fail(C... args)
 
 }
 
-
 #else
-
-#include <iostream>
-#include <stdlib.h>
 
 namespace rpc {
 
-static inline void fail(const std::string& str)
+void fatalRpcError(const char* diag);
+
+template<class... C>
+static inline void fail(const C&... strs)
 {
-	std::cerr << str << std::endl;
-	abort();
+	char unsafeErrorBuffer[128];
+
+	const char* a[] = {strs...};
+	auto ptr = unsafeErrorBuffer;
+	const auto end = ptr + sizeof(unsafeErrorBuffer) - 1;
+
+	for(const char* s: a)
+	{
+		while(char c = *s++)
+		{
+			*ptr++ = c;
+			if(ptr == end)
+			{
+				break;
+			}
+		}
+
+		if(ptr == end)
+		{
+			break;
+		}
+	}
+
+	*ptr = 0;
+	fatalRpcError(unsafeErrorBuffer);
 }
 
 }
