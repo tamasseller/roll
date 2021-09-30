@@ -9,7 +9,7 @@ namespace rpc {
  * Writer for array backed collection.
  * 
  * Specifying it as an argument to a remote method invocation enables the 
- * serialization of a plain block of memory as a colletion.
+ * serialization of a plain block of memory as a collection.
  */
 template<class T>
 class ArrayWriter
@@ -31,8 +31,10 @@ public:
     /**
      * Construct from a reference to an actual array.
      */
-    template<size_t n>
-    inline ArrayWriter(const T (&data)[n]): data(data), length(n) {}
+    template<class U, size_t n>
+    inline ArrayWriter(const U (&data)[n]): data((const T*)data), length(n) {
+    	static_assert(sizeof(U) == sizeof(T));
+    }
 
     /**
      * STL container like size getter.
@@ -71,6 +73,52 @@ template<class T> struct TypeInfo<ArrayWriter<T>>: StlCompatibleCollectionTypeBa
                 return false;
 
         return true;    
+    }
+};
+
+/**
+ * Wrapper for a single element collection value.
+ *
+ * Specifying it as an argument to a remote method invocation enables the
+ * serialization of a single element as a collection.
+ */
+template<class T>
+struct ArrayWrapper
+{
+    const T data;
+
+public:
+    /**
+     * Construct from element value.
+     */
+    inline ArrayWrapper(const T& data): data(data) {}
+
+    /**
+     * Construct from element value.
+     */
+    inline ArrayWrapper(T&& data): data(rpc::move(data)) {}
+};
+
+template<class T> ArrayWrapper(const T&) -> ArrayWrapper<T>;
+
+/**
+ * Serialization rules for ArrayWrapper.
+ */
+template<class T> struct TypeInfo<ArrayWrapper<T>>: CollectionTypeBase<T>
+{
+    template<class A> static inline bool write(A& a, const ArrayWrapper<T> &v)
+    {
+        if(!VarUint4::write(a, 1))
+            return false;
+
+		if(!TypeInfo<T>::write(a, v.data))
+			return false;
+
+        return true;
+    }
+
+    template<class C> static constexpr inline size_t size(const C& v) {
+        return TypeInfo<T>::size(v.data) + ::rpc::VarUint4::size(1);
     }
 };
 

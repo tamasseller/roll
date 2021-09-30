@@ -42,7 +42,7 @@ public:
      * 
      * Needed for compatibility with range based for loop expressions.
      */
-    inline auto end() { return StreamEnd{}; }
+    static inline auto end() { return StreamEnd{}; }
 
     /**
      * STL-like size getter.
@@ -141,6 +141,23 @@ public:
      * Needed for compatibility with range based for loop expressions.
      */
     auto begin() const { return Cursor(accessor, length); }
+
+    /**
+     * Helper that copies at most _n_ of the initial elements from the collection
+     *
+     * Returns the number of elements copied.
+     */
+    inline size_t copy(T* out, size_t n) const
+    {
+    	size_t idx = 0;
+
+    	for(auto it = begin(); (idx < n) && it != end(); idx++, it++)
+    	{
+    		*out++ = *it;
+    	}
+
+    	return idx;
+    }
 };
 
 /**
