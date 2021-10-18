@@ -84,9 +84,20 @@ template <size_t n> CTStr(const char (&)[n]) -> CTStr<n - 1>;
 
 }
 
+#if (__cpp_nontype_template_parameter_class >= 201806L)
 template <rpc::CTStr cs>
 static constexpr inline auto operator "" _ctstr() {
 	return cs;
 }
+#else
+
+template <class T, T... cs>
+static constexpr inline auto operator "" _ctstr() {
+	constexpr char a[] = {cs..., '\0'};
+	return rpc::CTStr<sizeof...(cs)>(a);
+}
+
+
+#endif
 
 #endif /* _RPCCTSTR_H_ */
