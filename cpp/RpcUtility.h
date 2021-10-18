@@ -107,10 +107,4 @@ static constexpr auto &hasCrtpBase = decltype(detail::check_crtp_base<Base>::isO
 
 }
 
-template <class T, T... cs>
-static inline auto operator "" _nt() -> const T (&)[sizeof...(cs)] {
-	static constexpr const T str[] = {cs...};
-	return str;
-}
-
 #endif /* _RPCUTILITY_H_ */

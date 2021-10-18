@@ -22,8 +22,8 @@ template<class...> struct SignatureGenerator;
  */
 template<> struct SignatureGenerator<>
 {
-	template<class S> static inline constexpr decltype(auto) writeTypes(S&& s) { return rpc::forward<S>(s); }
-	template<class S> static inline constexpr decltype(auto) writeNextType(S&& s) { return rpc::forward<S>(s); }
+	template<class S> static inline constexpr decltype(auto) writeTypes(S&& s) { return s; }
+	template<class S> static inline constexpr decltype(auto) writeNextType(S&& s) { return s; }
 };
 
 /**
@@ -34,12 +34,14 @@ struct SignatureGenerator<First, Rest...>
 {
 	template<class S>
 	static inline constexpr decltype(auto) writeNextType(S&& s) {
-		return SignatureGenerator<Rest...>::writeNextType(TypeInfo<remove_cref_t<First>>::writeName(s << ","));
+		auto &&x = TypeInfo<remove_cref_t<First>>::writeName(s << ",");
+		return SignatureGenerator<Rest...>::writeNextType(rpc::move(x));
 	}
 
 	template<class S>
-	static inline constexpr decltype(auto) writeTypes(S&& s) { 
-		return SignatureGenerator<Rest...>::writeNextType(TypeInfo<remove_cref_t<First>>::writeName(s));
+	static inline constexpr decltype(auto) writeTypes(S&& s) {
+		auto &&x = TypeInfo<remove_cref_t<First>>::writeName(s);
+		return SignatureGenerator<Rest...>::writeNextType(rpc::move(x));
 	}
 };
 

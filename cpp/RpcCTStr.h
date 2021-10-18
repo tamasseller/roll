@@ -12,16 +12,14 @@ namespace rpc {
  * Helper class used for generation of method signatures.
  */
 template<size_t length>
-class CTStr
+struct CTStr
 {
     char data[length + 1];
-    template<size_t n> friend class CTStr;
-    
-public:
+
     static constexpr size_t strLength = length;
 
     template<size_t n1, size_t n2>
-    constexpr CTStr(const CTStr<n1>& s1, const char(&arr)[n2]): data{0}
+    inline constexpr CTStr(const CTStr<n1>& s1, const char(&arr)[n2]): data{0}
     {
 		static_assert(n1 + n2 - 1 == length);
 		
@@ -32,23 +30,22 @@ public:
 			data[n1 + i] = arr[i];
 	}
 
-    constexpr CTStr(const char(&arr)[length + 1]): data{0}
+    inline constexpr CTStr(const char(&arr)[length + 1]): data{0}
     {
         for(auto i = 0u; i < length + 1; i++)
 			data[i] = arr[i];
     }
 
-    constexpr CTStr(const CTStr&) = default;
+    inline constexpr CTStr(const CTStr&) = default;
 
-    constexpr operator const char *() const { return data; }
-    constexpr size_t size() const { return size; }
+    inline constexpr operator const char *() const { return data; }
 
 	/*
 	 * FNV-1a hash of the string **including null-terminator**.
 	 *
 	 * https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
 	 */
-    constexpr auto hash() const
+    inline constexpr auto hash() const
     {
     	const uint64_t offset = uint64_t(14695981039346656037u);
 		const uint64_t prime = uint64_t(1099511628211u);
@@ -83,12 +80,13 @@ static inline constexpr CTStr<n1 + n2 - 1> operator<<(const CTStr<n1>& s1, const
 	return CTStr<n1 + n2 - 1>(s1, a2);
 }
 
+template <size_t n> CTStr(const char (&)[n]) -> CTStr<n - 1>;
+
 }
 
-template <class T, T... cs>
+template <rpc::CTStr cs>
 static constexpr inline auto operator "" _ctstr() {
-	constexpr char a[] = {cs..., '\0'};
-	return rpc::CTStr<sizeof...(cs)>(a);
+	return cs;
 }
 
 #endif /* _RPCCTSTR_H_ */

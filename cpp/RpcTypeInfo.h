@@ -32,7 +32,7 @@ template<class T, char prefix> struct PrimitveIntegerTypeInfoBase
 {
 	static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8);
 	static_assert(prefix == 'i' || prefix == 'u');
-	static constexpr const char sgn[] = {prefix, '0' + (char)sizeof(T), '\0'};
+	static constexpr const char sgn[3] = {prefix, '0' + (char)sizeof(T), '\0'};
 
 	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { return s << sgn; }
 	template<class S> static inline bool write(S& s, const T &v) { return s.write(v); }
