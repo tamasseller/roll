@@ -27,6 +27,8 @@ namespace detail
 		CallOperatorSignatureUtility<Ret (Type::*)(Ctx1, Ctx2, Args...) const> {};
 }
 
+struct EmptyBase {};
+
 /**
  * RPC engine front-end.
  */
@@ -34,14 +36,16 @@ template <
 	template<class> class Pointer,
 	template<class, class> class Registry,
 	class InputAccessor,
-	class IoEngine
+	class IoEngine,
+	class RegistryElementBase = EmptyBase
 >
 class Endpoint:
 	Core<
 		InputAccessor,
 		Pointer, 
 		Registry, 
-		Endpoint<Pointer, Registry, InputAccessor, IoEngine>&
+		RegistryElementBase,
+		Endpoint<Pointer, Registry, InputAccessor, IoEngine, RegistryElementBase>&
 	>
 {
 	using CallId = typename Endpoint::Core::CallId;

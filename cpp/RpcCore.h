@@ -18,6 +18,7 @@ template
 	class InputAccessor,
 	template<class> class Pointer,
 	template<class, class> class Registry,
+	class RegistryElementBase,
 	class... ExtraArgs
 >
 class Core
@@ -29,7 +30,7 @@ private:
 	/**
 	 * Polymorphic invocation interface.
 	 */
-	struct IInvoker {
+	struct IInvoker: RegistryElementBase {
 		/**
 		 * Deserialization and invocation of a registered method.
 		 */
