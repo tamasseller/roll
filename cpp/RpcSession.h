@@ -68,7 +68,7 @@ protected:
         	rpc::fail(rpc::Errors::sessionNotOpen);
         }
 
-        if(auto _err = _ep->call(imported.*method, std::forward<Args>(args)...))
+        if(auto _err = _ep->call(imported.*method, rpc::forward<Args>(args)...))
 		{
         	rpc::fail(_err);
 		}
@@ -84,7 +84,7 @@ protected:
 		else
 		{
 			exported.*method = _ep.install([_self](Ep& ep, rpc::MethodHandle, Args... args) {
-				((*_self).*onClosedMember)(std::forward<Args>(args)...);
+				((*_self).*onClosedMember)(rpc::forward<Args>(args)...);
 			});
 		}
 	}

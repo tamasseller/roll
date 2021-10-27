@@ -1,7 +1,11 @@
 #ifndef _RPCUTILITY_H_
 #define _RPCUTILITY_H_
 
+#include <cstddef>
+
 namespace rpc {
+
+template<size_t...> struct sequence;
 
 namespace detail  
 {
@@ -41,6 +45,15 @@ namespace detail
     	template<class Subject> static constexpr Bool<true> isOk(const Base<Subject>&) { return {}; }
     	static constexpr Bool<false> isOk(...) { return {}; }
     };
+
+    template<size_t...> struct make_sequence;
+    template<size_t first, size_t... rest> struct make_sequence<first, rest...>
+    {
+    	static_assert((int)first > 0);
+    	using T = typename make_sequence<first - 1, first, rest...>::T;
+    };
+
+    template<size_t... i> struct make_sequence<0, i...> { using T = sequence<0, i...>; };
 }
 
 /**
@@ -104,6 +117,9 @@ template<class C> static inline C& declval();
 
 template<template<class> class Base, class Subject>
 static constexpr auto &hasCrtpBase = decltype(detail::check_crtp_base<Base>::isOk(declval<Subject>()))::v;
+
+
+template<size_t n> using indices = typename detail::make_sequence<n - 1>;
 
 }
 

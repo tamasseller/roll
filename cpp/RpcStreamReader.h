@@ -9,7 +9,7 @@ namespace rpc {
  * Streaming collection reader, used for zero-copy deserialization.
  * 
  * Specifying it as an argument of a remotely callable method allows it to 
- * read a collection lazily - ie. without needing its members to be parsed
+ * read a collection lazily - i.e. without needing its members to be parsed
  * during deserialization. It allows the method to parse the elements of the 
  * collection while iterating through it.
  */

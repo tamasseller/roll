@@ -143,60 +143,6 @@ template<class... Args> struct TypeInfo<Call<Args...>>
 };
 
 /**
- * Common serialization rules for all collection objects.
- * 
- * A collection's length is written first using variable length encoding 
- * then the elements of the collection are written one after the other.
- */
-template<class T> struct CollectionTypeBase: CollectionPlaceholder<T>
-{ 
-	template<class S> static inline bool skip(S& s)
-    {
-        uint32_t count;
-        if(!::rpc::VarUint4::read(s, count))
-            return false;
-
-        while(count--)
-            if(!TypeInfo<T>::skip(s))
-                return false;
-
-        return true;
-    }
-
-	static constexpr inline bool isConstSize() { return false; }
-};
-
-/**
- * Common serialization rules for STL-like containers.
- * 
- * NOTE: see CollectionTypeBase for generic rules of collection serialization.
- */
-template<class C, class T> struct StlCompatibleCollectionTypeBase: CollectionTypeBase<T>
-{ 
-    static constexpr inline size_t size(const C& v) 
-    {
-        size_t contentSize = 0;
-        uint32_t count = 0;
-
-        if constexpr(TypeInfo<T>::isConstSize())
-        {
-            count = v.size();
-            contentSize = count ? (count * TypeInfo<T>::size(*v.begin())) : 0;
-        }
-        else
-        {
-            for(const auto &x: v)
-            {
-                contentSize += TypeInfo<T>::size(x);
-                count++;
-            }
-        }
-
-        return contentSize + ::rpc::VarUint4::size(count);
-    }
-};
-
-/**
  * Common serialization rules for struct or tuple like (aggregate) object.
  * 
  * An aggregate is encoded simply as its members one after the other.
@@ -223,6 +169,16 @@ template<class T, class U>
 static constexpr bool isCompatible() {
 	return TypeInfo<remove_cref_t<T>>::writeName(""_ctstr) == TypeInfo<remove_cref_t<U>>::writeName(""_ctstr);
 }
+
+template<class Info> struct DereferenceTypeInfo
+{
+	template<class S> static constexpr inline decltype(auto) writeName(S&& s) { return Info::writeName(s); }
+	template<class S, class Type> static inline bool write(S& s, Type v) { return Info::write(s, *v); }
+	template<class S, class Type> static inline bool read(S& s, Type v) { return Info::read(s, *v); }
+	template<class Type> static constexpr inline size_t size(Type v) { return Info::size(*v); }
+	template<class S> static inline bool skip(S& s) { return Info::skip(s); }
+	static constexpr inline bool isConstSize() { return Info::isConstSize(); }
+};
 
 }
 

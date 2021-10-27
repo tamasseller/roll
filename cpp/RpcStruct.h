@@ -1,19 +1,16 @@
 #ifndef RPC_CPP_RPCSTRUCT_H_
 #define RPC_CPP_RPCSTRUCT_H_
 
-#include "RpcStlTypes.h"
+#include "RpcCollection.h"
+#include "RpcArrayWriter.h"
 
 namespace rpc {
-
-namespace detail {
-
-} // namespace detail
 
 template<auto member> struct StructMember;
 
 template<class Struct, class Type, Type Struct::* mptr> struct StructMember<mptr>
 {
-	using T = Type;
+	using T = remove_cref_t<Type>;
 
 	static constexpr inline Type& writeAccess(Struct& s) {
 		return s.*mptr;
@@ -21,6 +18,23 @@ template<class Struct, class Type, Type Struct::* mptr> struct StructMember<mptr
 
 	static constexpr inline const Type& readAccess(const Struct& s) {
 		return s.*mptr;
+	}
+};
+
+template<auto ptr, auto length> struct DataBlock : decltype(ptr) { };
+
+template<auto ptr, class Struct, class LengthType, LengthType Struct::* len> struct DataBlock<ptr, len>
+{
+	using ElementType = remove_cref_t<decltype(*(declval<Struct>().*ptr))>;
+
+	using T = rpc::ArrayWriter<ElementType>;
+
+	static constexpr inline auto writeAccess(const Struct& s) {
+		return rpc::ArrayWriter<ElementType>(s.*ptr, s.*len);
+	}
+
+	static constexpr inline auto readAccess(const Struct& s) {
+		return writeAccess(s);
 	}
 };
 

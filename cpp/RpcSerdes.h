@@ -70,19 +70,23 @@ namespace detail
 		}
 	};
 	
-	template<class T, class S>
-	static inline T readNext(S& s, bool &ok) 
+	template<class T>
+	struct ReadNext
 	{
 		T v;
 
-		if(ok)
+		template<class S>
+		inline ReadNext(S& s, bool &ok)
 		{
-			if(!TypeInfo<T>::read(s, v))
-				ok = false;
+			if(ok)
+			{
+				if(!TypeInfo<T>::read(s, v))
+				{
+					ok = false;
+				}
+			}
 		}
-		
-		return v;
-	}
+	};
 
 	template<class Arg>
 	static constexpr inline size_t getSize(const Arg& c) {
@@ -129,7 +133,7 @@ static inline const char* deserialize(S& s, C&& c, ExtraArgs&&... extraArgs)
 	//  associated with any initializer clause that follows it in the brace-enclosed
 	//  comma-separated list of initalizers.
 	//
-	return detail::CallHelper{rpc::forward<C>(c), rpc::forward<ExtraArgs>(extraArgs)..., detail::readNext<Args>(s, ok)..., ok}.result;
+	return detail::CallHelper{rpc::forward<C>(c), rpc::forward<ExtraArgs>(extraArgs)..., detail::ReadNext<remove_cref_t<Args>>(s, ok).v..., ok}.result;
 }
 
 }

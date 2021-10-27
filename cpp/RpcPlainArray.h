@@ -13,8 +13,10 @@ namespace rpc {
  *
  * NOTE: see CollectionTypeBase for generic rules of collection serialization.
  */
-template<class T, size_t n> struct TypeInfo<T[n]>: CollectionTypeBase<remove_const_t<T>>
+template<class T, size_t n> struct TypeInfo<T[n]>: CollectionPlaceholder<remove_const_t<T>>
 {
+	static constexpr inline bool isConstSize() { return TypeInfo<T>::isConstSize(); }
+
     static constexpr inline size_t size(const T(&v)[n])
     {
         size_t contentSize = 0;
@@ -44,7 +46,7 @@ template<class T, size_t n> struct TypeInfo<T[n]>: CollectionTypeBase<remove_con
 		return true;
 	}
 
-	template<class S, class A> static inline bool read(S& s, T(&v)[n], A&& a)
+	template<class S> static inline bool read(S& s, T(&v)[n])
 	{
 		uint32_t count;
 		if(!VarUint4::read(s, count))
@@ -57,6 +59,49 @@ template<class T, size_t n> struct TypeInfo<T[n]>: CollectionTypeBase<remove_con
 		{
 			if(!TypeInfo<T>::read(s, x))
 				return false;
+		}
+
+		return true;
+	}
+};
+
+
+
+/**
+ * Serialization rules for a C string array.
+ *
+ * NOTE: see CollectionTypeBase for generic rules of collection serialization.
+ */
+template<> struct TypeInfo<const char*>: CollectionPlaceholder<char>
+{
+	static constexpr inline bool isConstSize() { return false; }
+
+    static constexpr inline size_t size(const char* str)
+    {
+        auto s = str;
+
+		while(*str)
+		{
+			str++;
+		}
+
+		const auto n = str - s;
+        return TypeInfo<char>::size('\0') * n + VarUint4::size(n);
+    }
+
+	template<class S> static inline bool write(S& s, const char* str)
+	{
+		auto n = size(str);
+
+		if(!VarUint4::write(s, n))
+			return false;
+
+		while(n--)
+		{
+			if(!TypeInfo<char>::write(s, *str++))
+			{
+				return false;
+			}
 		}
 
 		return true;

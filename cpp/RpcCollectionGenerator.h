@@ -42,7 +42,7 @@ class CollectionGenerator
 				return *(T*)nullptr;
 
 			--remaining;
-			return generator();
+			return generator(remaining);
         }
 
         /**
@@ -100,7 +100,7 @@ public:
 template<class C>
 static auto generateCollection(uint32_t length, C &&c)
 {
-	using T = decltype(c());
+	using T = decltype(c(uint32_t{}));
 	return CollectionGenerator<T, C>(length, rpc::move(c));
 }
 
