@@ -76,8 +76,8 @@ template<> struct TypeInfo<const char*>: CollectionPlaceholder<char>
 {
 	static constexpr inline bool isConstSize() { return false; }
 
-    static constexpr inline size_t size(const char* str)
-    {
+	static constexpr inline size_t stringLength(const char* str)
+	{
         auto s = str;
 
 		while(*str)
@@ -85,13 +85,18 @@ template<> struct TypeInfo<const char*>: CollectionPlaceholder<char>
 			str++;
 		}
 
-		const auto n = str - s;
+		return str - s;
+	}
+
+    static constexpr inline size_t size(const char* str)
+    {
+    	const auto n = stringLength(str);
         return TypeInfo<char>::size('\0') * n + VarUint4::size(n);
     }
 
 	template<class S> static inline bool write(S& s, const char* str)
 	{
-		auto n = size(str);
+		auto n = stringLength(str);
 
 		if(!VarUint4::write(s, n))
 			return false;
