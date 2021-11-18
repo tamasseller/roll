@@ -1,7 +1,7 @@
 #ifndef _RPCSTLSTREAMREADER_H_
 #define _RPCSTLSTREAMREADER_H_
 
-#include "types/TypeInfo.h"
+#include "types/CollectionTypeInfoCommon.h"
 
 namespace rpc {
 

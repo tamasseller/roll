@@ -4,6 +4,9 @@
 #include "common/CTStr.h"
 #include "common/Errors.h"
 
+#include "types/CallTypeInfo.h"
+#include "types/PrimitiveTypeInfo.h"
+
 #include "RpcCore.h"
 #include "Symbol.h"
 #include "SignatureGenerator.h"
