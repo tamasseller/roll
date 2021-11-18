@@ -3,8 +3,6 @@
 
 #include "common/Utility.h"
 
-#include "Call.h"
-
 namespace rpc {
 
 /**

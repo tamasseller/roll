@@ -1,7 +1,7 @@
 #ifndef _RPCARRAYWRITER_H_
 #define _RPCARRAYWRITER_H_
 
-#include "types/TypeInfo.h"
+#include "types/CollectionTypeInfoCommon.h"
 
 namespace rpc {
 
