@@ -5,10 +5,13 @@
 
 #include "base/RpcEndpoint.h"
 
+#include "types/Collection.h"
+
 #include <memory>
 #include <sstream>
 #include <unordered_map>
 #include <mutex>
+#include <vector>
 
 #include <cassert>
 
