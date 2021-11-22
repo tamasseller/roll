@@ -61,7 +61,7 @@ class SessionBase
 
 protected:
 	template<auto method, class Ep, class... Args>
-	inline auto callImported(Ep& _ep, Args&&... args)
+	inline auto callImported(const Ep& _ep, Args&&... args)
 	{
         if(!importDone)
         {
@@ -117,8 +117,13 @@ public:
 	}
 
 	template<class Ep>
-	inline auto close(Ep& _ep) {
-		return callImported<&Imported::_close>(_ep);
+	inline void close(const Ep& _ep)
+	{
+		if(importDone)
+		{
+			callImported<&Imported::_close>(_ep);
+			importDone = false;
+		}
 	}
 
 	inline ~SessionBase()
