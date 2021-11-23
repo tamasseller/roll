@@ -1,7 +1,7 @@
 #ifndef RPC_CPP_RPCSTLADAPTERS_H_
 #define RPC_CPP_RPCSTLADAPTERS_H_
 
-#include "common/Fail.h"
+#include "framework/Fail.h"
 
 #include "base/RpcEndpoint.h"
 

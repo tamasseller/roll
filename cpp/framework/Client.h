@@ -110,7 +110,8 @@ protected:
 	};
 
     template<class Call, class... Args>
-    inline void callAction(Call& call, Args&&... args) {
+    inline void callAction(Call& call, Args&&... args)
+    {
     	call.call(*this, std::forward<Args>(args)...);
     }
 

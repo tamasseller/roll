@@ -22,9 +22,9 @@ protected:
 			(self->*member)(rpc::forward<Args>(args)...);
 		});
 
-		if(err)
+		if(!!err)
 		{
-			rpc::fail("Registering '", (const char*)sym, "': ", err);
+			rpc::fail("Registering '", (const char*)sym, "': ", getErrorString(err));
 		}
 	}
 
@@ -33,15 +33,15 @@ protected:
 	{
 		auto err = this->provide(sym, [self{static_cast<Child*>(this)}](Endpoint& ep, rpc::MethodHandle, Args... args, rpc::Call<Ret> cb)
 		{
-			if(auto err = ep.call(cb, (self->*member)(rpc::forward<Args>(args)...)))
+			if(auto err = ep.call(cb, (self->*member)(rpc::forward<Args>(args)...)); !!err)
 			{
-				rpc::fail("Calling callback of '", (const char*)sym, "': ", err);
+				rpc::fail("Calling callback of '", (const char*)sym, "': ", getErrorString(err));
 			}
 		});
 
-		if(err)
+		if(!!err)
 		{
-			rpc::fail("Registering '", (const char*)sym, "': ", err);
+			rpc::fail("Registering '", (const char*)sym, "': ", getErrorString(err));
 		}
 	}
 
@@ -52,17 +52,17 @@ protected:
 		{
 			auto obj = (self->*member)(rpc::forward<Args>(args)...);
 
-			if(auto err = ep.call(accept, obj->exportLocal(ep, obj)))
+			if(auto err = ep.call(accept, obj->exportLocal(ep, obj)); !!err)
 			{
-				rpc::fail("Calling accept for '", (const char*)sym, "': ", err);
+				rpc::fail("Calling accept for '", (const char*)sym, "': ", getErrorString(err));
 			}
 
 			obj->importRemote(exports);
 		});
 
-		if(err)
+		if(!!err)
 		{
-			rpc::fail("Registering '", (const char*)sym, "': ", err);
+			rpc::fail("Registering '", (const char*)sym, "': ", getErrorString(err));
 		}
 	}
 
@@ -75,17 +75,17 @@ protected:
 			auto ret = rpc::move(pair.first);
 			auto obj = rpc::move(pair.second);
 
-			if(auto err = ep.call(accept, rpc::move(ret), obj->exportLocal(ep, obj)))
+			if(auto err = ep.call(accept, rpc::move(ret), obj->exportLocal(ep, obj)); !!err)
 			{
-				rpc::fail("Calling accept for '", (const char*)sym, "': ", err);
+				rpc::fail("Calling accept for '", (const char*)sym, "': ", getErrorString(err));
 			}
 
 			obj->importRemote(exports);
 		});
 
-		if(err)
+		if(!!err)
 		{
-			rpc::fail("Registering '", (const char*)sym, "': ", err);
+			rpc::fail("Registering '", (const char*)sym, "': ", getErrorString(err));
 		}
 	}
 

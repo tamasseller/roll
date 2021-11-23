@@ -36,7 +36,7 @@ private:
 		/**
 		 * Deserialization and invocation of a registered method.
 		 */
-		virtual const char* invoke(InputAccessor &a, CallId id, ExtraArgs...) = 0;
+		virtual Errors invoke(InputAccessor &a, CallId id, ExtraArgs...) = 0;
 
 		/**
 		 * The virtual destructor is required because the captured 
@@ -61,7 +61,7 @@ private:
 		 * allow for move-only functor type (for example a lambda
 		 * object that captures a move-only value).
 		 */
-		Invoker(T&& target): target(rpc::move(target)) {}
+		inline Invoker(T&& target): target(rpc::move(target)) {}
 
 		/**
 		 * The virtual destructor is required because the captured 
@@ -76,7 +76,7 @@ private:
 		 * Uses deserializer helper to parse the arguments and pass them directly 
 		 * to the target method.
 		 */
-		virtual const char* invoke(InputAccessor &a, CallId id, ExtraArgs... extraArgs) override {
+		inline virtual Errors invoke(InputAccessor &a, CallId id, ExtraArgs... extraArgs) override final {
 			return deserialize<NominalArgs...>(a, target, extraArgs..., MethodHandle(id));
 		}
 	};
@@ -104,17 +104,22 @@ public:
 	 *   - Parse error during method identifier or argument parsing.
 	 *   - Failure to find the method registration corresponding to the identifier.
 	 */
-	const char* execute(InputAccessor &a, ExtraArgs... args)
+	Errors execute(InputAccessor &a, ExtraArgs... args)
 	{
 		CallId id;
 
 		if(!VarUint4::read(a, id))
+		{
 			return Errors::messageFormatError;
+		}
 
 		bool ok;
 		auto it = registry.find(id, ok);
+
 		if(!ok)
-			return Errors::wrongMethodRequest;
+		{
+			return Errors::undefinedMethodCalled;
+		}
 
 		return (*it)->invoke(a, id, args...);
 	}

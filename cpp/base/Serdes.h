@@ -15,15 +15,15 @@ namespace detail
 	template<> struct RetvalHelper<void>
 	{
 		template<class V, class... A>
-		static inline constexpr const char* execute(V&& c, A&&... a) {
-			return c(rpc::forward<A>(a)...), nullptr;
+		static inline constexpr auto execute(V&& c, A&&... a) {
+			return c(rpc::forward<A>(a)...), rpc::Errors::success;
 		}
 	};
 
-	template<> struct RetvalHelper<const char*>
+	template<> struct RetvalHelper<rpc::Errors>
 	{
 		template<class V, class... A>
-		static inline constexpr const char* execute(V&& c, A&&... a) {
+		static inline constexpr auto execute(V&& c, A&&... a) {
 			return c(rpc::forward<A>(a)...);
 		}
 	};
@@ -53,7 +53,7 @@ namespace detail
 	 */
 	struct CallHelper
 	{
-		const char* result = Errors::wrongMethodRequest;
+		Errors result = Errors::messageFormatError;
 
 		template<class C, class... Types>
 		inline constexpr CallHelper(C&& c, Types&&... args) 
@@ -124,7 +124,7 @@ bool serialize(S& s, Args&&... args)
  * a functor using them as arguments using the TypeInfo template class.
  */
 template<class... Args, class... ExtraArgs, class C, class S>
-static inline const char* deserialize(S& s, C&& c, ExtraArgs&&... extraArgs)
+static inline Errors deserialize(S& s, C&& c, ExtraArgs&&... extraArgs)
 {
 	bool ok = true;
 

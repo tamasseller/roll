@@ -54,7 +54,7 @@ class Endpoint:
 
 	Registry<decltype(""_ctstr.hash()), CallId> symbolRegistry;
 
-	const char* doLookup(uint64_t id, size_t length, CallId cb)
+	Errors doLookup(uint64_t id, size_t length, CallId cb)
 	{
 		bool buildOk;
 
@@ -72,7 +72,10 @@ class Endpoint:
 		if(buildOk)
 		{
 			if(static_cast<IoEngine*>(this)->send(rpc::move(data)))
-				return nullptr;
+			{
+				return Errors::success;
+			}
+
 
 			return Errors::couldNotSendLookupMessage;
 		}
@@ -94,7 +97,7 @@ public:
 		[](Endpoint& ep, const MethodHandle &id, uint64_t idHash, Call<CallId> callback)
 		{
 			CallId r = invalidId;
-			const char* ret = nullptr;
+			Errors ret = Errors::success;
 
 			bool ok;
 			auto result = ep.symbolRegistry.find(idHash, ok);
@@ -104,10 +107,10 @@ public:
 			}
 			else
 			{
-				ret = Errors::unknownMethodRequested;
+				ret = Errors::unknownSymbolRequested;
 			}
 
-			if(auto err = ep.call(callback, r))
+			if(auto err = ep.call(callback, r); !!err)
 			{
 				ret = err;
 			}
@@ -165,23 +168,23 @@ public:
 	 * NOTE: a public method must not be **uninstalled** this way, but it needs to be **discarded**
 	 *       using its symbol instead.
 	 *
-	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
+	 * The returned error code indicates success or the type of failure that occurred.
 	 */
-	inline const char* uninstall(const rpc::MethodHandle &h)
+	inline Errors uninstall(const rpc::MethodHandle &h)
 	{
 		auto &core = *((typename Endpoint::Core*)this);
 
 		if(!core.removeCall(h.id))
 			return Errors::methodNotFound;
 
-		return nullptr;
+		return Errors::success;
 	}
 
 	/**
 	 * Removes a method registration identified by its Call object returned at 
 	 * registration.
 	 * 
-	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
+	 * The returned error code indicates success or the type of failure that occurred.
 	 */
 	template<class... Args>
 	inline auto uninstall(const rpc::Call<Args...> &c) {
@@ -191,14 +194,14 @@ public:
 	/**
 	 * Initiate a remote method call with the supplied parameters.
 	 * 
-	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
+	 * The returned error code indicates success or the type of failure that occurred.
 	 * The possible errors include:
 	 * 
 	 *  - Processing error during the serialization of the method identifier or arguments,
 	 *  - IO error during sending the request.
 	 */
 	template<class... NominalArgs, class... ActualArgs>
-	inline const char* call(const Call<NominalArgs...> &call, ActualArgs&&... args)
+	inline Errors call(const Call<NominalArgs...> &call, ActualArgs&&... args)
 	{
 		bool buildOk;
 
@@ -208,7 +211,7 @@ public:
 		if(buildOk)
 		{
 			if(static_cast<IoEngine*>(this)->send(rpc::move(data)))
-				return nullptr;
+				return Errors::success;
 
 			return Errors::couldNotSendMessage;
 		}
@@ -226,10 +229,10 @@ public:
 	 * 
 	 * The arguments of the functor are expected to be the same as described for the _install_ operation.
 	 *
-	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
+	 * The returned error code indicates success or the type of failure that occurred.
 	 */
 	template<size_t n, class... Args, class C>
-	inline const char* provide(const Symbol<n, Args...> &sym, C&& c)
+	inline Errors provide(const Symbol<n, Args...> &sym, C&& c)
 	{
 		Call<Args...> id = this->install(rpc::forward<C>(c));
 		
@@ -245,7 +248,7 @@ public:
 			return Errors::symbolAlreadyExported;
 		}
 
-		return nullptr;
+		return Errors::success;
 	}
 
 	/**
@@ -255,10 +258,10 @@ public:
 	 * After the operation the method can no longer be looked up or invoked using a handle
 	 * acquired earlier.
 	 * 
-	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
+	 * The returned error code indicates success or the type of failure that occurred.
 	 */
 	template<size_t n, class... Args>
-	inline const char* discard(const Symbol<n, Args...> &sym)
+	inline Errors discard(const Symbol<n, Args...> &sym)
 	{
 		const auto idHash = sym.hash();
 
@@ -267,7 +270,7 @@ public:
 
 		if(!ok)
 		{
-			return Errors::noSuchSymbol;
+			return Errors::symbolNotFound;
 		}
 
 		auto result = *rPtr;
@@ -277,7 +280,7 @@ public:
 			return Errors::internalError; // GCOV_EXCL_LINE
 		}
 		
-		return nullptr;
+		return Errors::success;
 	}
 
 	/**
@@ -296,10 +299,10 @@ public:
 	 *     found remotely - then the value of the second argument must be considered
 	 *     invalid and not be used for remote invocation.
 	 *      
-	 * Returns nullptr on success, the appropriate rpc::Errors constants string member on error.
+	 * The returned error code indicates success or the type of failure that occurred.
 	 */
 	template<size_t n, class... Args, class C>
-	inline const char* lookup(const Symbol<n, Args...> &sym, C&& c) 
+	inline Errors lookup(const Symbol<n, Args...> &sym, C&& c)
 	{
 		auto &core = *((typename Endpoint::Core*)this);
 		auto id = core.template add<CallId>([this, c{rpc::forward<C>(c)}](Endpoint &ep, const rpc::MethodHandle &handle, CallId result) mutable
@@ -309,10 +312,10 @@ public:
 			if(!ep.removeCall(handle.id))
 				return Errors::internalError; // GCOV_EXCL_LINE
 
-			return (const char*) nullptr;
+			return Errors::success;
 		});
 
-		if(auto err = doLookup(sym.hash(), n, id))
+		if(auto err = doLookup(sym.hash(), n, id); !!err)
 		{
 			if(!core.removeCall(id))
 				return Errors::internalError; // GCOV_EXCL_LINE
@@ -320,7 +323,7 @@ public:
 			return err;
 		}
 		
-		return nullptr;
+		return Errors::success;
 	}
 };
 

@@ -1,16 +1,22 @@
 #ifndef RPC_CPP_INTEROP_RPCFAIL_H_
 #define RPC_CPP_INTEROP_RPCFAIL_H_
 
-#ifdef __EXCEPTIONS
-/**
- * RPC specific exception object.
+/*
+ * Platform dependent failure handling routine definition.
+ *
+ * Its purpose is to adapt to the optional usage of exception handling.
  */
+
+#ifdef __EXCEPTIONS
 
 #include <sstream>
 #include <exception>
 
 namespace rpc {
 
+/**
+ * RPC specific exception object.
+ */
 class RpcException: public std::exception
 {
     std::string str;

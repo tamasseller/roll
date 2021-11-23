@@ -1,8 +1,9 @@
 #ifndef RPC_CPP_RPCSESSION_H_
 #define RPC_CPP_RPCSESSION_H_
 
-#include "common/Fail.h"
 #include "common/Errors.h"
+
+#include "Fail.h"
 
 namespace rpc {
 
@@ -61,21 +62,21 @@ class SessionBase
 
 protected:
 	template<auto method, class Ep, class... Args>
-	inline auto callImported(const Ep& _ep, Args&&... args)
+	inline auto callImported(const Ep& ep, Args&&... args)
 	{
         if(!importDone)
         {
-        	rpc::fail(rpc::Errors::sessionNotOpen);
+        	rpc::fail("the session is not functional (yet/anymore)");
         }
 
-        if(auto _err = _ep->call(imported.*method, rpc::forward<Args>(args)...))
+        if(auto r = ep->call(imported.*method, rpc::forward<Args>(args)...); !!r)
 		{
-        	rpc::fail(_err);
+        	rpc::fail(rpc::getErrorString(r));
 		}
 	}
 
 	template<auto method, auto onClosedMember, class Ep, class Self, class... Args>
-	inline auto exportCall(Ep& _ep, Self _self)
+	inline auto exportCall(Ep& ep, Self self)
 	{
 		if(!addFinalizer(&unexportCall<method, Ep, Self>))
 		{
@@ -83,14 +84,14 @@ protected:
 		}
 		else
 		{
-			exported.*method = _ep.install([_self](Ep& ep, rpc::MethodHandle, Args... args) {
-				((*_self).*onClosedMember)(rpc::forward<Args>(args)...);
+			exported.*method = ep.install([self](Ep& ep, rpc::MethodHandle, Args... args) {
+				((*self).*onClosedMember)(rpc::forward<Args>(args)...);
 			});
 		}
 	}
 
 	template<auto onClosedMember, class Ep, class Self>
-	inline auto finalizeExports(Ep& _ep, Self _self)
+	inline auto finalizeExports(Ep& ep, Self self)
 	{
 		if(!addFinalizer(&callOnClosed<Self>))
 		{
@@ -99,9 +100,9 @@ protected:
 		}
 		else
 		{
-			exported._close = _ep.install([_self](Ep& ep, rpc::MethodHandle h)
+			exported._close = ep.install([self](Ep& ep, rpc::MethodHandle h)
 			{
-				(*_self).finalize(&ep, &_self);
+				(*self).finalize(&ep, &self);
 				ep.uninstall(h);
 			});
 
@@ -117,11 +118,11 @@ public:
 	}
 
 	template<class Ep>
-	inline void close(const Ep& _ep)
+	inline void close(const Ep& ep)
 	{
 		if(importDone)
 		{
-			callImported<&Imported::_close>(_ep);
+			callImported<&Imported::_close>(ep);
 			importDone = false;
 		}
 	}
