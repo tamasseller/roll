@@ -13,10 +13,10 @@
 
 namespace rpc {
 
-template<class Io>
-class ClientBase: public StlEndpoint<Io>
+template<class Endpoint>
+class ClientBase: public Endpoint, Tracker
 {
-    friend typename ClientBase::Endpoint;
+	template<class, class, size_t> friend class SessionBase;
 
     volatile bool locked;
     std::mutex m;
@@ -118,7 +118,7 @@ protected:
     template<class Call, class Callback, class... Args>
     inline void callWithCallback(Call& call, Callback&& cb, Args&&... args)
     {
-    	auto id = this->install([cb{std::move(cb)}](Endpoint& rpc, rpc::MethodHandle h, rpc::Arg<0, &Callback::operator()> arg)
+    	auto id = this->install([cb{std::move(cb)}](ClientBase& rpc, rpc::MethodHandle h, rpc::Arg<0, &Callback::operator()> arg)
 		{
     		cb(rpc::move(arg));
     		rpc.uninstall(h);
@@ -133,7 +133,7 @@ protected:
     	std::promise<Ret> p;
     	auto f = p.get_future();
 
-    	auto id = this->install([p{std::move(p)}](Endpoint& rpc, rpc::MethodHandle h, Ret arg) mutable
+    	auto id = this->install([p{std::move(p)}](ClientBase& rpc, rpc::MethodHandle h, Ret arg) mutable
 		{
     		p.set_value(arg);
     		rpc.uninstall(h);
@@ -146,27 +146,27 @@ protected:
     template<class Call, class Obj, class Callback, class... Args>
     inline void createWithCallback(Call& call, Obj obj, Callback&& cb, Args&&... args)
     {
-    	auto id = this->install([cb{std::move(cb)}, obj](Endpoint& rpc, rpc::MethodHandle h, rpc::Arg<0, &rpc::remove_cref_t<decltype(*obj)>::importRemote> import)
+    	auto id = this->install([cb{std::move(cb)}, obj](ClientBase& rpc, rpc::MethodHandle h, rpc::Arg<0, &rpc::remove_cref_t<decltype(*obj)>::importRemote> import)
 		{
     		obj->importRemote(import);
     		cb();
     		rpc.uninstall(h);
     	});
 
-    	call.call(*this, std::forward<Args>(args)..., obj->exportLocal((Endpoint&)*this, obj), id);
+    	call.call(*this, std::forward<Args>(args)..., obj->exportLocal(*this, obj), id);
     }
 
     template<class Call, class Obj, class Callback, class... Args>
     inline void createWithCallbackRetval(Call& call, Obj obj, Callback&& cb, Args&&... args)
     {
-    	auto id = this->install([cb{std::move(cb)}, obj](Endpoint& rpc, rpc::MethodHandle h, rpc::Arg<0, &Callback::operator()> arg, rpc::Arg<0, &rpc::remove_cref_t<decltype(*obj)>::importRemote> import)
+    	auto id = this->install([cb{std::move(cb)}, obj](ClientBase& rpc, rpc::MethodHandle h, rpc::Arg<0, &Callback::operator()> arg, rpc::Arg<0, &rpc::remove_cref_t<decltype(*obj)>::importRemote> import)
 		{
     		obj->importRemote(import);
     		cb(rpc::move(arg));
     		rpc.uninstall(h);
     	});
 
-    	call.call(*this, std::forward<Args>(args)..., obj->exportLocal((Endpoint&)*this, obj), id);
+    	call.call(*this, std::forward<Args>(args)..., obj->exportLocal(*this, obj), id);
     }
 
     template<class Call, class Obj, class... Args>
@@ -175,14 +175,14 @@ protected:
     	std::promise<void> p;
     	auto f = p.get_future();
 
-    	auto id = this->install([p{std::move(p)}, obj](Endpoint& rpc, rpc::MethodHandle h, rpc::Arg<0, &rpc::remove_cref_t<decltype(*obj)>::importRemote> import) mutable
+    	auto id = this->install([p{std::move(p)}, obj](ClientBase& rpc, rpc::MethodHandle h, rpc::Arg<0, &rpc::remove_cref_t<decltype(*obj)>::importRemote> import) mutable
 		{
     		obj->importRemote(import);
     		p.set_value();
     		rpc.uninstall(h);
     	});
 
-    	call.call(*this, std::forward<Args>(args)..., obj->exportLocal((Endpoint&)*this, obj), id);
+    	call.call(*this, std::forward<Args>(args)..., obj->exportLocal(*this, obj), id);
     	return f;
     }
 
@@ -192,29 +192,23 @@ protected:
     	std::promise<Ret> p;
 		auto f = p.get_future();
 
-    	auto id = this->install([p{std::move(p)}, obj](Endpoint& rpc, rpc::MethodHandle h, Ret arg, rpc::Arg<0, &rpc::remove_cref_t<decltype(*obj)>::importRemote> import) mutable
+    	auto id = this->install([p{std::move(p)}, obj](ClientBase& rpc, rpc::MethodHandle h, Ret arg, rpc::Arg<0, &rpc::remove_cref_t<decltype(*obj)>::importRemote> import) mutable
 		{
     		obj->importRemote(import);
     		p.set_value(rpc::move(arg));
     		rpc.uninstall(h);
     	});
 
-    	call.call(*this, std::forward<Args>(args)..., obj->exportLocal((Endpoint&)*this, obj), id);
+    	call.call(*this, std::forward<Args>(args)..., obj->exportLocal(*this, obj), id);
     	return f;
     }
 
 public:
-    using Endpoint = typename ClientBase::StlEndpoint::Endpoint;
+    using Endpoint::Endpoint;
 
-    using Endpoint::call;
-    using Endpoint::install;
-    using Endpoint::uninstall;
-    using Endpoint::lookup;
-    using Endpoint::provide;
-    using Endpoint::discard;
-    using Endpoint::process;
-
-    using ClientBase::StlEndpoint::StlEndpoint;
+    inline void connectionClosed() {
+    	this->Tracker::notifySubobjects(*this);
+	}
 };
 
 }

@@ -98,14 +98,15 @@ namespace detail
  * the STL implementation. When tighter control over heap usage is a requirement alternate
  * implementations for the dependencies can be used.
  */
-template<class Io>
+template<class Child, class Io>
 class StlEndpoint:
 	public Io,
 	public Endpoint<
+		Child,
 		detail::StlAutoPointer,
 		detail::HashMapRegistry,
 		typename Io::InputAccessor,
-		StlEndpoint<Io>
+		StlEndpoint<Child, Io>
 	>
 {
 public:

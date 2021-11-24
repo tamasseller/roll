@@ -7,14 +7,29 @@
 #include "types/CallTypeInfo.h"
 #include "types/PrimitiveTypeInfo.h"
 
-#include "RpcCore.h"
 #include "Symbol.h"
+#include "Serdes.h"
 #include "SignatureGenerator.h"
 
 namespace rpc {
 
-namespace detail 
+struct EmptyBase {};
+
+/**
+ * RPC engine front-end.
+ */
+template <
+	class Child,
+	template<class> class Pointer,
+	template<class, class> class Registry,
+	class InputAccessor,
+	class IoEngine,
+	class RegistryElementBase = EmptyBase
+>
+class Endpoint
 {
+	using CallId = uint32_t;
+
 	template<class> struct CallOperatorSignatureUtility;
 
 	template<class Ret, class Type, class Ctx1, class Ctx2, class... Args> struct CallOperatorSignatureUtility<Ret (Type::*)(Ctx1, Ctx2, Args...) const>
@@ -27,32 +42,136 @@ namespace detail
 
 	template<class Ret, class Type, class Ctx1, class Ctx2, class... Args> struct CallOperatorSignatureUtility<Ret (Type::*)(Ctx1, Ctx2, Args...)>:
 		CallOperatorSignatureUtility<Ret (Type::*)(Ctx1, Ctx2, Args...) const> {};
-}
 
-struct EmptyBase {};
+	/**
+	 * Polymorphic invocation interface.
+	 */
+	struct IInvoker: RegistryElementBase {
+		/**
+		 * Deserialization and invocation of a registered method.
+		 */
+		virtual Errors invoke(InputAccessor &a, CallId id, Child& ep) = 0;
 
-/**
- * RPC engine front-end.
- */
-template <
-	template<class> class Pointer,
-	template<class, class> class Registry,
-	class InputAccessor,
-	class IoEngine,
-	class RegistryElementBase = EmptyBase
->
-class Endpoint:
-	Core<
-		InputAccessor,
-		Pointer, 
-		Registry, 
-		RegistryElementBase,
-		Endpoint<Pointer, Registry, InputAccessor, IoEngine, RegistryElementBase>&
-	>
-{
-	using CallId = typename Endpoint::Core::CallId;
+		/**
+		 * The virtual destructor is required because the captured
+		 * functor may have non-trivial destructor.
+		 */
+		inline virtual ~IInvoker() = default;
+	};
+
+	/**
+	 * Templated implementation of the invocation interface.
+	 */
+	template<class T, class... NominalArgs>
+	struct Invoker: IInvoker
+	{
+		/**
+		 * The captured RPC method functor.
+		 */
+		T target;
+
+		/**
+		 * The actual invoker object is always move constructed to
+		 * allow for move-only functor type (for example a lambda
+		 * object that captures a move-only value).
+		 */
+		inline Invoker(T&& target): target(rpc::move(target)) {}
+
+		/**
+		 * The virtual destructor is required because the captured
+		 * functor may have non-trivial destructor. (for example
+		 * captured in a lambda).
+		 */
+		inline virtual ~Invoker() = default;
+
+		/**
+		 * Implementation of the specific deserialization and invocation.
+		 * Knowns the argument types and the actual target functor to be called.
+		 * Uses deserializer helper to parse the arguments and pass them directly
+		 * to the target method.
+		 */
+		inline virtual Errors invoke(InputAccessor &a, CallId id, Child& ep) override final {
+			return deserialize<NominalArgs...>(a, target, ep, MethodHandle(id));
+		}
+	};
+
+	/**
+	 * Numeric identifier based RPC method registry.
+	 */
+	Registry<CallId, Pointer<IInvoker>> registry;
 
 	Registry<decltype(""_ctstr.hash()), CallId> symbolRegistry;
+
+	/**
+	 * Helper to assign the next free id to a new registration.
+	 */
+	CallId maxId = 0;
+
+	/**
+	 * Process an incoming message.
+	 *
+	 * The call identifier is parsed from the beginning, then the method
+	 * registry is consulted to find the appropriate invoker object. The
+	 * parsing of and the actual invocation is handled by the invoker.
+	 *
+	 * Return true on success, false on error. The errors may invlude:
+	 *
+	 *   - Parse error during method identifier or argument parsing.
+	 *   - Failure to find the method registration corresponding to the identifier.
+	 */
+	inline Errors execute(CallId id, InputAccessor &a)
+	{
+		bool ok;
+		auto it = registry.find(id, ok);
+
+		if(!ok)
+		{
+			return Errors::undefinedMethodCalled;
+		}
+
+		return (*it)->invoke(a, id, *static_cast<Child*>(this));
+	}
+
+	/**
+	 * Register a method for any available method identifier.
+	 *
+	 * Returns the associated method identifier.
+	 */
+	template<class... Args, class T>
+	inline CallId add(T&& call)
+	{
+		auto ptr = Pointer<IInvoker>::template make<Invoker<T, Args...>>(rpc::move(call));
+
+		CallId id;
+
+		do
+		{
+			id = maxId++;
+		}
+		while(!registry.add(id, rpc::move(ptr)));
+
+		return id;
+	}
+
+	/**
+	 * Build a message for invoking a method with the provided identifier
+	 * and arguments. Arguments are serialized using the serialize helper
+	 * according to the rules specified by the TypeInfo template class.
+	 */
+	template<class... NominalArgs, class... ActualArgs, class Factory>
+	static inline auto buildCall(Factory& factory, bool &ok, CallId id, ActualArgs&&... args)
+	{
+		using C = Call<NominalArgs...>;
+		C c{id};
+
+		static_assert(writeSignature<NominalArgs...>(""_ctstr) == writeSignature<ActualArgs...>(""_ctstr), "RPC invocation signature mismatched");
+
+		auto size = determineSize(c, args...);
+		auto pdu = factory.build(size);
+
+		ok = serialize(pdu, c, rpc::forward<ActualArgs>(args)...);
+		return factory.done(rpc::move(pdu));
+	}
 
 	Errors doLookup(uint64_t id, size_t length, CallId cb)
 	{
@@ -60,7 +179,7 @@ class Endpoint:
 
 		auto f = static_cast<IoEngine*>(this)->messageFactory();
 
-		auto data = this->Endpoint::Core::template buildCall<uint64_t, Call<CallId>>
+		auto data = buildCall<uint64_t, Call<CallId>>
 		(
 			f,
 			buildOk,
@@ -75,7 +194,6 @@ class Endpoint:
 			{
 				return Errors::success;
 			}
-
 
 			return Errors::couldNotSendLookupMessage;
 		}
@@ -93,8 +211,7 @@ public:
 	 */
 	bool init()
 	{
-		return this->Endpoint::Core::template addCallAt<uint64_t, Call<CallId>>(lookupId,
-		[](Endpoint& ep, const MethodHandle &id, uint64_t idHash, Call<CallId> callback)
+		auto lookupResponder = [](Child& ep, const MethodHandle &id, uint64_t idHash, Call<CallId> callback)
 		{
 			CallId r = invalidId;
 			Errors ret = Errors::success;
@@ -116,7 +233,11 @@ public:
 			}
 
 			return ret;
-		});
+		};
+
+		auto respInvoker = Pointer<IInvoker>::template make<Invoker<decltype(lookupResponder), uint64_t, Call<CallId>>>(rpc::move(lookupResponder));
+
+		return registry.add(lookupId, rpc::move(respInvoker));
 	}
 
 	/**
@@ -131,8 +252,16 @@ public:
 	 *  - IO error during reading or
 	 *  - Failure to find the requested method in the registry.
 	 */
-	auto process(InputAccessor& a) {
-		return Endpoint::Core::execute(a, *this);
+	auto process(InputAccessor& a)
+	{
+		CallId id;
+
+		if(!VarUint4::read(a, id))
+		{
+			return Errors::messageFormatError;
+		}
+
+		return execute(id, a);
 	}
 
 	/**
@@ -155,10 +284,8 @@ public:
 	 * Returns a Call method handle that can be used to execute the registered method.
 	 */
 	template<class C>
-	inline auto install(C&& c) 
-	{
-		auto &core = *((typename Endpoint::Core*)this);
-		return detail::CallOperatorSignatureUtility<decltype(&C::operator())>::install(core, rpc::move(c));
+	inline auto install(C&& c) {
+		return CallOperatorSignatureUtility<decltype(&C::operator())>::install(*this, rpc::move(c));
 	}
 
 	/**
@@ -172,10 +299,10 @@ public:
 	 */
 	inline Errors uninstall(const rpc::MethodHandle &h)
 	{
-		auto &core = *((typename Endpoint::Core*)this);
-
-		if(!core.removeCall(h.id))
+		if(!registry.remove(h.id))
+		{
 			return Errors::methodNotFound;
+		}
 
 		return Errors::success;
 	}
@@ -207,7 +334,7 @@ public:
 
 		auto f = static_cast<IoEngine*>(this)->messageFactory();
 
-		auto data = this->Endpoint::Core::template buildCall<NominalArgs...>(f, buildOk, call.id, rpc::forward<ActualArgs>(args)...);
+		auto data = this->Endpoint::template buildCall<NominalArgs...>(f, buildOk, call.id, rpc::forward<ActualArgs>(args)...);
 		if(buildOk)
 		{
 			if(static_cast<IoEngine*>(this)->send(rpc::move(data)))
@@ -238,9 +365,7 @@ public:
 		
 		if(!symbolRegistry.add(sym.hash(), rpc::move(id.id)))
 		{
-			auto &core = *((typename Endpoint::Core*)this);
-
-			if(!core.removeCall(id.id))
+			if(!registry.remove(id.id))
 			{
 				return Errors::internalError; // GCOV_EXCL_LINE
 			}
@@ -274,8 +399,8 @@ public:
 		}
 
 		auto result = *rPtr;
-		auto &core = *((typename Endpoint::Core*)this);
-		if(!symbolRegistry.remove(idHash) || !core.removeCall(result))
+
+		if(!symbolRegistry.remove(idHash) || !registry.remove(result))
 		{
 			return Errors::internalError; // GCOV_EXCL_LINE
 		}
@@ -304,26 +429,36 @@ public:
 	template<size_t n, class... Args, class C>
 	inline Errors lookup(const Symbol<n, Args...> &sym, C&& c)
 	{
-		auto &core = *((typename Endpoint::Core*)this);
-		auto id = core.template add<CallId>([this, c{rpc::forward<C>(c)}](Endpoint &ep, const rpc::MethodHandle &handle, CallId result) mutable
+		auto id = add<CallId>([this, c{rpc::forward<C>(c)}](Child &ep, const rpc::MethodHandle &handle, CallId result) mutable
 		{
 			c(ep, result != invalidId, Call<Args...>{result});
 
-			if(!ep.removeCall(handle.id))
+			if(!registry.remove(handle.id))
+			{
 				return Errors::internalError; // GCOV_EXCL_LINE
+			}
 
 			return Errors::success;
 		});
 
 		if(auto err = doLookup(sym.hash(), n, id); !!err)
 		{
-			if(!core.removeCall(id))
+			if(!registry.remove(id))
+			{
 				return Errors::internalError; // GCOV_EXCL_LINE
+			}
 
 			return err;
 		}
 		
 		return Errors::success;
+	}
+
+	/**
+	 * Issues a simulated call to a locally registered method that takes no arguments.
+	 */
+	inline Errors simulateCall(rpc::Call<> call) {
+		return execute(call.id, *((InputAccessor*)nullptr));
 	}
 };
 

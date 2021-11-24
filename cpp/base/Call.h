@@ -15,8 +15,7 @@ namespace detail {
 }
 
 class MethodHandle;
-template<class, template<class> class, template<class, class> class, class, class...> class Core;
-template<template<class> class, template<class, class> class, class, class, class> class Endpoint;
+template<class, template<class> class, template<class, class> class, class, class, class> class Endpoint;
 template<class T> struct TypeInfo;
 struct CallIdTestAccessor;
 
@@ -24,9 +23,9 @@ struct CallIdTestAccessor;
  * Transferable remote procedure handle.
  * 
  * It is used to identify a method for the purpose of remotely initiated
- * invocation. A Call object can be acquired by symbol based lookup from
- * the remote end and it can also be created locally by installing a method
- * that can be executed later by the remote end.
+ * invocation. A Call object can be acquired by symbol based lookup or
+ * argument passing from the remote end and it can also be created locally
+ * by installing a method that can be executed later by the remote end.
  */
 template<class... Args> 
 class Call
@@ -39,9 +38,7 @@ class Call
 	friend CallIdTestAccessor;
 	template<class...> friend class Call;
 	template<class> friend struct TypeInfo;
-	template<class> friend class detail::CallOperatorSignatureUtility;
-	template<class, template<class> class, template<class, class> class, class, class...> friend class Core;
-	template<template<class> class, template<class, class> class, class, class, class> friend class Endpoint;
+	template<class, template<class> class, template<class, class> class, class, class, class> friend class Endpoint;
 
 public:
     constexpr inline Call() = default;
@@ -62,8 +59,6 @@ public:
 	constexpr inline bool operator==(const Call& other) const {
 		return id == other.id;
 	}
-
-	inline auto diagGetId() const { return id; }
 };
 
 /**
@@ -75,7 +70,7 @@ class MethodHandle
 {
 	uint32_t id;
 
-	template<template<class> class, template<class, class> class, class, class, class> friend class Endpoint;
+	template<class, template<class> class, template<class, class> class, class, class, class> friend class Endpoint;
 
 	template<class... C>
 	inline MethodHandle(const Call<C...> &c): id(c.id) {}

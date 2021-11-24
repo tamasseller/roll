@@ -4,29 +4,28 @@
 #include "common/Errors.h"
 
 #include "Fail.h"
+#include "Tracker.h"
 
 namespace rpc {
 
 template<class> class ClientBase;
 
 template<class Imported, class Exported, size_t nExported>
-class SessionBase
+class SessionBase: public Tracker::Subobject
 {
 	template<class> friend class rpc::ClientBase;
-	using OnClosed = rpc::Call<>;
+	using Unexporter = void (*)(void*, const void*);
 
 	Exported exported;
 	Imported imported;
 	bool importDone = false;
-
-	using Unexporter = void (*)(void*, const void*);
 	Unexporter unexporters[nExported + 1] = {nullptr, };
 
 	template<auto method, class Ep, class Self>
-	static inline void unexportCall(void* endpunkt, const void* mich)
+	static inline void unexportCall(void* e, const void* s)
 	{
-		auto& self = *static_cast<const Self*>(mich);
-		auto& ep = *static_cast<Ep*>(endpunkt);
+		auto& self = *static_cast<const Self*>(s);
+		auto& ep = *static_cast<Ep*>(e);
 		ep.uninstall(((*self).exported).*method);
 	}
 
@@ -60,32 +59,53 @@ class SessionBase
 		}
 	}
 
-protected:
-	template<auto method, class Ep, class... Args>
-	inline auto callImported(const Ep& ep, Args&&... args)
+	template<bool ignoreFailure, auto method, class Ep, class... Args>
+	inline void callImportedMayFail(const Ep& ep, Args&&... args)
 	{
         if(!importDone)
         {
-        	rpc::fail("the session is not functional (yet/anymore)");
+			if constexpr(ignoreFailure)
+			{
+				return;
+			}
+			else
+			{
+				rpc::fail("the session is not functional (yet/anymore)"); /* GCOV_EXCL_LINE */
+			}
         }
 
-        if(auto r = ep->call(imported.*method, rpc::forward<Args>(args)...); !!r)
+        auto r = ep->call(imported.*method, rpc::forward<Args>(args)...);
+
+		if constexpr(!ignoreFailure)
 		{
-        	rpc::fail(rpc::getErrorString(r));
+			if(!!r)
+			{
+				rpc::fail(rpc::getErrorString(r)); /* GCOV_EXCL_LINE */
+			}
+		}
+		else
+		{
+			(void)r;
 		}
 	}
 
-	template<auto method, auto onClosedMember, class Ep, class Self, class... Args>
+protected:
+	template<auto method, class Ep, class... Args>
+	inline void callImported(const Ep& ep, Args&&... args) {
+        callImportedMayFail<false, method, Ep, Args...>(ep, rpc::forward<Args>(args)...);
+	}
+
+	template<auto method, auto member, class Ep, class Self, class... Args>
 	inline auto exportCall(Ep& ep, Self self)
 	{
 		if(!addFinalizer(&unexportCall<method, Ep, Self>))
 		{
-			rpc::fail("Finalizer table full");
+			rpc::fail("Finalizer table full"); /* GCOV_EXCL_LINE */
 		}
 		else
 		{
 			exported.*method = ep.install([self](Ep& ep, rpc::MethodHandle, Args... args) {
-				((*self).*onClosedMember)(rpc::forward<Args>(args)...);
+				((*self).*member)(rpc::forward<Args>(args)...);
 			});
 		}
 	}
@@ -95,7 +115,7 @@ protected:
 	{
 		if(!addFinalizer(&callOnClosed<Self>))
 		{
-			rpc::fail("Finalizer table full");
+			rpc::fail("Finalizer table full"); /* GCOV_EXCL_LINE */
 			return *(decltype(exported)*)nullptr;
 		}
 		else
@@ -103,8 +123,11 @@ protected:
 			exported._close = ep.install([self](Ep& ep, rpc::MethodHandle h)
 			{
 				(*self).finalize(&ep, &self);
+				ep.Tracker::removeSubobject(self->Tracker::Subobject::asSubobject());
 				ep.uninstall(h);
 			});
+
+			ep.Tracker::addSubobject(self->Tracker::Subobject::asSubobject(), exported._close);
 
 			return exported;
 		}
@@ -122,7 +145,7 @@ public:
 	{
 		if(importDone)
 		{
-			callImported<&Imported::_close>(ep);
+			callImportedMayFail<true, &Imported::_close, Ep>(ep);
 			importDone = false;
 		}
 	}
@@ -133,7 +156,7 @@ public:
 		{
 			if(u)
 			{
-				rpc::fail("Active session destroyed");
+				rpc::fail("Active session destroyed"); /* GCOV_EXCL_LINE */
 				break;
 			}
 		}
