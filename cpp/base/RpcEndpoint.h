@@ -19,7 +19,6 @@ struct EmptyBase {};
  * RPC engine front-end.
  */
 template <
-	class Child,
 	template<class> class Pointer,
 	template<class, class> class Registry,
 	class InputAccessor,
@@ -32,16 +31,28 @@ class Endpoint
 
 	template<class> struct CallOperatorSignatureUtility;
 
-	template<class Ret, class Type, class Ctx1, class Ctx2, class... Args> struct CallOperatorSignatureUtility<Ret (Type::*)(Ctx1, Ctx2, Args...) const>
+	template<class Ret, class Type, class Ep, class MhRef, class... Args> struct CallOperatorSignatureUtility<Ret (Type::*)(Ep, MhRef, Args...) const>
 	{
 		template<class Core, class C>
 		static inline decltype(auto) install(Core &core, C&& c) {
-			return Call<remove_cref_t<Args>...>{core.template add<remove_cref_t<Args>...>(rpc::forward<C>(c))};
+			return Call<remove_cref_t<Args>...>{core.template add<Ep, remove_cref_t<Args>...>(rpc::forward<C>(c))};
 		}
 	};
 
-	template<class Ret, class Type, class Ctx1, class Ctx2, class... Args> struct CallOperatorSignatureUtility<Ret (Type::*)(Ctx1, Ctx2, Args...)>:
-		CallOperatorSignatureUtility<Ret (Type::*)(Ctx1, Ctx2, Args...) const> {};
+	template<class Ret, class Type, class Ep, class MhRef, class... Args> struct CallOperatorSignatureUtility<Ret (Type::*)(Ep, MhRef, Args...)>:
+		CallOperatorSignatureUtility<Ret (Type::*)(Ep, MhRef, Args...) const> {};
+
+
+	template<class> struct CallOperatorFirstArgTypeExtractor;
+
+	template<class Ret, class Type, class Ep, class... Rest> struct CallOperatorFirstArgTypeExtractor<Ret (Type::*)(Ep, Rest...) const> {
+		using T = Ep;
+	};
+
+	template<class Ret, class Type, class Ep, class... Rest> struct CallOperatorFirstArgTypeExtractor<Ret (Type::*)(Ep, Rest...)> {
+		using T = Ep;
+	};
+
 
 	/**
 	 * Polymorphic invocation interface.
@@ -50,7 +61,7 @@ class Endpoint
 		/**
 		 * Deserialization and invocation of a registered method.
 		 */
-		virtual Errors invoke(InputAccessor &a, CallId id, Child& ep) = 0;
+		virtual Errors invoke(InputAccessor &a, CallId id, Endpoint& ep) = 0;
 
 		/**
 		 * The virtual destructor is required because the captured
@@ -62,7 +73,7 @@ class Endpoint
 	/**
 	 * Templated implementation of the invocation interface.
 	 */
-	template<class T, class... NominalArgs>
+	template<class Ep, class T, class... NominalArgs>
 	struct Invoker: IInvoker
 	{
 		/**
@@ -90,8 +101,8 @@ class Endpoint
 		 * Uses deserializer helper to parse the arguments and pass them directly
 		 * to the target method.
 		 */
-		inline virtual Errors invoke(InputAccessor &a, CallId id, Child& ep) override final {
-			return deserialize<NominalArgs...>(a, target, ep, MethodHandle(id));
+		inline virtual Errors invoke(InputAccessor &a, CallId id, Endpoint& ep) override final {
+			return deserialize<NominalArgs...>(a, target, static_cast<Ep&>(ep), MethodHandle(id));
 		}
 	};
 
@@ -129,7 +140,7 @@ class Endpoint
 			return Errors::undefinedMethodCalled;
 		}
 
-		return (*it)->invoke(a, id, *static_cast<Child*>(this));
+		return (*it)->invoke(a, id, *this);
 	}
 
 	/**
@@ -137,10 +148,10 @@ class Endpoint
 	 *
 	 * Returns the associated method identifier.
 	 */
-	template<class... Args, class T>
+	template<class Ep, class... Args, class T>
 	inline CallId add(T&& call)
 	{
-		auto ptr = Pointer<IInvoker>::template make<Invoker<T, Args...>>(rpc::move(call));
+		auto ptr = Pointer<IInvoker>::template make<Invoker<Ep, T, Args...>>(rpc::move(call));
 
 		CallId id;
 
@@ -211,7 +222,7 @@ public:
 	 */
 	bool init()
 	{
-		auto lookupResponder = [](Child& ep, const MethodHandle &id, uint64_t idHash, Call<CallId> callback)
+		auto lookupResponder = [](Endpoint& ep, const MethodHandle &id, uint64_t idHash, Call<CallId> callback)
 		{
 			CallId r = invalidId;
 			Errors ret = Errors::success;
@@ -235,7 +246,7 @@ public:
 			return ret;
 		};
 
-		auto respInvoker = Pointer<IInvoker>::template make<Invoker<decltype(lookupResponder), uint64_t, Call<CallId>>>(rpc::move(lookupResponder));
+		auto respInvoker = Pointer<IInvoker>::template make<Invoker<Endpoint&, decltype(lookupResponder), uint64_t, Call<CallId>>>(rpc::move(lookupResponder));
 
 		return registry.add(lookupId, rpc::move(respInvoker));
 	}
@@ -429,7 +440,9 @@ public:
 	template<size_t n, class... Args, class C>
 	inline Errors lookup(const Symbol<n, Args...> &sym, C&& c)
 	{
-		auto id = add<CallId>([this, c{rpc::forward<C>(c)}](Child &ep, const rpc::MethodHandle &handle, CallId result) mutable
+		using Ep = typename CallOperatorFirstArgTypeExtractor<decltype(&C::operator())>::T;
+
+		auto id = add<Ep, CallId>([this, c{rpc::forward<C>(c)}](Ep &ep, const rpc::MethodHandle &handle, CallId result) mutable
 		{
 			c(ep, result != invalidId, Call<Args...>{result});
 

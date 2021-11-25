@@ -89,7 +89,7 @@ protected:
 			else
 			{
 				rpc.suspendCalls();
-				rpc.lookup(sym, [=, &rpc](auto&, bool done, auto result) mutable
+				rpc.lookup(sym, [=, &rpc](Rpc&, bool done, typename Sym::CallType result) mutable
 				{
 					if(done)
 					{

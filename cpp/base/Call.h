@@ -15,7 +15,7 @@ namespace detail {
 }
 
 class MethodHandle;
-template<class, template<class> class, template<class, class> class, class, class, class> class Endpoint;
+template<template<class> class, template<class, class> class, class, class, class> class Endpoint;
 template<class T> struct TypeInfo;
 struct CallIdTestAccessor;
 
@@ -38,7 +38,7 @@ class Call
 	friend CallIdTestAccessor;
 	template<class...> friend class Call;
 	template<class> friend struct TypeInfo;
-	template<class, template<class> class, template<class, class> class, class, class, class> friend class Endpoint;
+	template<template<class> class, template<class, class> class, class, class, class> friend class Endpoint;
 
 public:
     constexpr inline Call() = default;
@@ -70,7 +70,7 @@ class MethodHandle
 {
 	uint32_t id;
 
-	template<class, template<class> class, template<class, class> class, class, class, class> friend class Endpoint;
+	template<template<class> class, template<class, class> class, class, class, class> friend class Endpoint;
 
 	template<class... C>
 	inline MethodHandle(const Call<C...> &c): id(c.id) {}
