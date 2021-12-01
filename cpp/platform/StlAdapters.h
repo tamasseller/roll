@@ -5,7 +5,8 @@
 
 #include "base/RpcEndpoint.h"
 
-#include "types/Collection.h"
+#include "types/StdStringTypeInfo.h"
+#include "types/StdVectorTypeInfo.h"
 
 #include <memory>
 #include <sstream>
